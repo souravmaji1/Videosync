@@ -1,0 +1,53 @@
+name: Render Remotion Video
+
+on:
+  repository_dispatch:
+    types: [render-video]
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Download Video from Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          curl -L -o input.mp4 "$SUPABASE_URL/storage/v1/object/public/videos/${{ github.event.client_payload.videoPath }}" \
+            -H "Authorization: Bearer $SUPABASE_KEY"
+
+      - name: Render Video with Remotion
+        env:
+          SUBTITLE: ${{ github.event.client_payload.subtitle }}
+          SUBTITLE_POSITION: ${{ github.event.client_payload.subtitlePosition }}
+          OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
+        run: |
+          npx remotion render VideoWithSubtitles \
+            --props "{\"videoUrl\": \"input.mp4\", \"subtitle\": \"$SUBTITLE\", \"subtitlePosition\": \"$SUBTITLE_POSITION\"}" \
+            --out $OUTPUT_FILE
+
+      - name: Upload Rendered Video to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
+        run: |
+          curl -X POST "$SUPABASE_URL/storage/v1/object/videos/$OUTPUT_FILE" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: video/mp4" \
+            --data-binary @./$OUTPUT_FILE

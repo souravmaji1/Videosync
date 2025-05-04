@@ -59,10 +59,4 @@ jobs:
           path: "*.mp4"
           retention-days: 7
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: "*.mp4"
-          tag_name: video
-          body: Rendered video 
-          prerelease: false
+   

@@ -28,6 +28,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
+          VIDEO_PATH: "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/videos/${{ github.event.client_payload.videoPath }}"
           curl -L -o input.mp4 "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/videos/${{ github.event.client_payload.videoPath }}" \
             -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI"
 
@@ -38,7 +39,7 @@ jobs:
           OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
         run: |
           npx remotion render VideoWithSubtitles \
-            --props "{\"videoUrl\": \"input.mp4\", \"subtitle\": \"$SUBTITLE\", \"subtitlePosition\": \"$SUBTITLE_POSITION\"}" \
+            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"subtitle\": \"$SUBTITLE\", \"subtitlePosition\": \"$SUBTITLE_POSITION\"}" \
             --out $OUTPUT_FILE
 
       - name: Upload Rendered Video to Supabase

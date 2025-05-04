@@ -23,14 +23,22 @@ jobs:
       - name: Install FFmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
+
       - name: Download Video from Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          VIDEO_PATH: "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
-          curl -L -o input.mp4 "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI"
+          VIDEO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
+          echo "Downloading video from $VIDEO_URL"
+          curl -L -o input.mp4 "$VIDEO_URL" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
+            --fail --silent --show-error
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to download video from Supabase"
+            exit 1
+          fi
+          ls -l input.mp4  # Verify the file exists
 
       - name: Render Video with Remotion
         env:
@@ -38,9 +46,11 @@ jobs:
           SUBTITLE_POSITION: ${{ github.event.client_payload.subtitlePosition }}
           OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
         run: |
+          VIDEO_PATH=$(realpath input.mp4)
           npx remotion render VideoWithSubtitles \
             --props "{\"videoUrl\": \"$VIDEO_PATH\", \"subtitle\": \"$SUBTITLE\", \"subtitlePosition\": \"$SUBTITLE_POSITION\"}" \
-            --out $OUTPUT_FILE
+            --out "$OUTPUT_FILE"
+          ls -l "$OUTPUT_FILE"  # Verify the output file exists
 
       - name: Upload Rendered Video to Supabase
         env:
@@ -48,7 +58,12 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
         run: |
-          curl -X POST "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/avatars/$OUTPUT_FILE" \
+          curl -X POST "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/videos/$OUTPUT_FILE" \
             -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
             -H "Content-Type: video/mp4" \
-            --data-binary @./$OUTPUT_FILE
+            --data-binary @./"$OUTPUT_FILE" \
+            --fail --silent --show-error
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to upload rendered video to Supabase"
+            exit 1
+          fi

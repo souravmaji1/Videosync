@@ -31,6 +31,7 @@ import BulkUpload from '@/components/bulkupload';
 import { Player } from '@remotion/player';
 import { AbsoluteFill } from 'remotion';
 import { createClient } from '@supabase/supabase-js';
+import JSZip from 'jszip';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -121,9 +122,10 @@ export default function VideoUploadPage() {
           wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
         });
 
+        console.log(isLoadingFFmpeg)
+
         setFFmpeg(ffmpegInstance);
         setIsLoadingFFmpeg(false);
-        console.log(isLoadingFFmpeg)
       } catch (error) {
         console.error('Error loading FFmpeg:', error);
         setMessage('Failed to load FFmpeg');
@@ -341,6 +343,8 @@ export default function VideoUploadPage() {
     setIsProcessing(true);
 
     try {
+ 
+
       // Upload video segment to Supabase
       const segment = segmentVideos[index];
       const fileName = `segment_${index}_${Date.now()}.mp4`;
@@ -357,11 +361,11 @@ export default function VideoUploadPage() {
       }
 
       // Trigger GitHub Actions workflow
-      const githubToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN; // Store in .env
+      const githubToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
       const repoOwner = 'souravmaji1';
       const repoName = 'Videosync';
 
-      const response = await fetch(
+      const dispatchResponse = await fetch(
         `https://api.github.com/repos/${repoOwner}/${repoName}/dispatches`,
         {
           method: 'POST',
@@ -376,51 +380,150 @@ export default function VideoUploadPage() {
               videoPath: `input/${fileName}`,
               subtitle: subtitles[index] || '',
               subtitlePosition: subtitlePositions[index] || 'bottom',
-              outputFile: `output/rendered_${index}_${Date.now()}.mp4`
+              outputFile: `rendered_${index}_${Date.now()}.mp4`
             }
           })
         }
       );
 
-      if (!response.ok) {
+      if (!dispatchResponse.ok) {
         throw new Error('Failed to trigger GitHub Actions workflow');
       }
 
       setMessage(`Rendering job triggered for segment ${index + 1}. Awaiting completion...`);
 
-      // Poll Supabase for the rendered video (simplified; in production, use webhooks)
-      const outputFileName = `rendered_${index}_${Date.now()}.mp4`;
+      // Poll GitHub Actions for workflow completion
+      let workflowRunId = null;
       let attempts = 0;
       const maxAttempts = 60; // 5 minutes at 5-second intervals
 
+      // Wait for the workflow to be triggered
       while (attempts < maxAttempts) {
-        const { data: files } = await supabase.storage
-          .from('videos')
-          .list('output', { search: outputFileName });
+        const runsResponse = await fetch(
+          `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs`,
+          {
+            headers: {
+              Authorization: `Bearer ${githubToken}`,
+              Accept: 'application/vnd.github.v3+json'
+            }
+          }
+        );
 
-        if (files && files.length > 0) {
-          const { data: publicUrl } = supabase.storage
-            .from('videos')
-            .getPublicUrl(`output/${outputFileName}`);
+        if (!runsResponse.ok) {
+          throw new Error('Failed to fetch workflow runs');
+        }
 
-          // Trigger download
-          const a = document.createElement('a');
-          a.href = publicUrl.publicUrl;
-          a.download = `reel_with_subtitle_${index + 1}.mp4`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
+        const runsData = await runsResponse.json();
+        const recentRun = runsData.workflow_runs.find(
+          run => run.event === 'repository_dispatch' && run.status !== 'completed'
+        );
 
-          setMessage(`Segment ${index + 1} rendered and downloaded successfully.`);
-          setIsProcessing(false);
-          return;
+        if (recentRun) {
+          workflowRunId = recentRun.id;
+          break;
         }
 
         await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
         attempts++;
       }
 
-      throw new Error('Rendering timed out');
+      if (!workflowRunId) {
+        throw new Error('Workflow not triggered within timeout');
+      }
+
+      // Poll for workflow completion
+      attempts = 0;
+      while (attempts < maxAttempts) {
+        const runResponse = await fetch(
+          `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflowRunId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${githubToken}`,
+              Accept: 'application/vnd.github.v3+json'
+            }
+          }
+        );
+
+        if (!runResponse.ok) {
+          throw new Error('Failed to fetch workflow status');
+        }
+
+        const runData = await runResponse.json();
+        if (runData.status === 'completed') {
+          if (runData.conclusion !== 'success') {
+            throw new Error('Workflow failed');
+          }
+          break;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+        attempts++;
+      }
+
+      if (attempts >= maxAttempts) {
+        throw new Error('Workflow did not complete within timeout');
+      }
+
+      // Fetch artifacts
+      const artifactsResponse = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflowRunId}/artifacts`,
+        {
+          headers: {
+            Authorization: `Bearer ${githubToken}`,
+            Accept: 'application/vnd.github.v3+json'
+          }
+        }
+      );
+
+      if (!artifactsResponse.ok) {
+        throw new Error('Failed to fetch artifacts');
+      }
+
+      const artifactsData = await artifactsResponse.json();
+      const artifact = artifactsData.artifacts.find(a => a.name === 'rendered-video');
+
+      if (!artifact) {
+        throw new Error('Rendered video artifact not found');
+      }
+
+      // Download artifact
+      const artifactResponse = await fetch(artifact.url, {
+        headers: {
+          Authorization: `Bearer ${githubToken}`,
+          Accept: 'application/vnd.github.v3+json'
+        }
+      });
+
+      if (!artifactResponse.ok) {
+        throw new Error('Failed to download artifact');
+      }
+
+      const artifactZip = await artifactResponse.arrayBuffer();
+
+      // Extract MP4 from ZIP
+      const zip = new JSZip();
+      const zipContent = await zip.loadAsync(artifactZip);
+      const mp4File = Object.values(zipContent.files).find(file => file.name.endsWith('.mp4'));
+
+      if (!mp4File) {
+        throw new Error('No MP4 file found in artifact');
+      }
+
+      const mp4Blob = await mp4File.async('blob');
+      const downloadUrl = URL.createObjectURL(mp4Blob);
+
+      // Trigger download
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `reel_with_subtitle_${index + 1}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Clean up
+      URL.revokeObjectURL(downloadUrl);
+
+      setMessage(`Segment ${index + 1} rendered and downloaded successfully.`);
     } catch (error) {
       console.error('Error rendering with Remotion:', error);
       setMessage(`Error rendering video: ${error.message}`);
@@ -435,17 +538,6 @@ export default function VideoUploadPage() {
       setIsProcessing(false);
     }
   };
-
- {/* const downloadSegment = (index) => {
-    if (!segmentVideos[index]) return;
-    
-    const a = document.createElement('a');
-    a.href = segmentVideos[index].url;
-    a.download = `reel_segment_${index + 1}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }; */}
 
   const handleSubtitleChange = (index, value) => {
     const newSubtitles = [...subtitles];

@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronRight,
   Home,
-
   Settings,
   Users,
   BarChart2,
@@ -19,23 +18,27 @@ import {
   Sparkles,
   Play,
   Clock,
-
   Zap,
-
   BookOpen,
   Music,
   Cloud,
   Download,
-
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import BulkUpload from '@/components/bulkupload';
-import {  Player } from '@remotion/player';
+import { Player } from '@remotion/player';
 import { AbsoluteFill } from 'remotion';
-//import { renderMedia, selectComposition } from '@remotion/renderer';
-//import { bundle } from '@remotion/bundler';
+import { createClient } from '@supabase/supabase-js';
+import JSZip from 'jszip';
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
 // Subtitle Component for Remotion
 const SubtitleOverlay = ({ text, position = 'bottom' }) => {
   const positionStyles = {
@@ -100,7 +103,6 @@ export default function VideoUploadPage() {
   
   // Subtitle state
   const [subtitles, setSubtitles] = useState([]);
- 
   const [subtitlePositions, setSubtitlePositions] = useState([]);
 
   // Initialize FFmpeg
@@ -122,7 +124,6 @@ export default function VideoUploadPage() {
 
         setFFmpeg(ffmpegInstance);
         setIsLoadingFFmpeg(false);
-        console.log(isLoadingFFmpeg)
       } catch (error) {
         console.error('Error loading FFmpeg:', error);
         setMessage('Failed to load FFmpeg');
@@ -130,7 +131,6 @@ export default function VideoUploadPage() {
       }
     };
 
-    // Only load FFmpeg if we need it (when single video is selected)
     if (selectedOption === 'single' && !ffmpeg) {
       loadFFmpeg();
     }
@@ -146,7 +146,6 @@ export default function VideoUploadPage() {
   // Initialize subtitles when segments are created
   useEffect(() => {
     if (segmentVideos.length > 0) {
-      // Initialize subtitles and positions for each segment
       setSubtitles(segmentVideos.map(() => ''));
       setSubtitlePositions(segmentVideos.map(() => 'bottom'));
     }
@@ -189,18 +188,15 @@ export default function VideoUploadPage() {
       setMessage('Analyzing video...');
       
       try {
-        // Create a video element to get duration and dimensions
         const videoEl = document.createElement('video');
         videoEl.preload = 'metadata';
         
-        // Create a promise to handle the metadata loading
         const metadataLoaded = new Promise((resolve) => {
           videoEl.onloadedmetadata = () => resolve(videoEl);
         });
         
         videoEl.src = URL.createObjectURL(file);
         
-        // Wait for metadata to load
         const loadedVideo = await metadataLoaded;
         
         const info = {
@@ -213,13 +209,11 @@ export default function VideoUploadPage() {
         setUploadedVideo(file);
         setVideoInfo(info);
         
-        // Clear previous segments
         setSegmentVideos([]);
         setSubtitles([]);
         setSubtitlePositions([]);
         
         if (selectedOption === 'single') {
-          // Auto-process when a video is uploaded for single video option
           if (info.duration > 30) {
             await splitVideo(info);
           } else {
@@ -229,7 +223,6 @@ export default function VideoUploadPage() {
           setMessage(`Video "${file.name}" is ready for processing.`);
         }
         
-        // Cleanup
         URL.revokeObjectURL(loadedVideo.src);
       } catch (error) {
         console.error(`Error analyzing video ${file.name}:`, error);
@@ -247,41 +240,35 @@ export default function VideoUploadPage() {
 
     setIsProcessing(true);
     setMessage('Processing video...');
-    setSegmentVideos([]); // Clear previous segments
+    setSegmentVideos([]);
 
     try {
-      // Special case for videos longer than 5 minutes (300 seconds)
       if (videoInfo.duration > 300) {
-        // Cut exactly 4 segments of 30 seconds each for Instagram Reels
         setMessage('Splitting into 4 segments of 30 seconds each for Instagram Reels...');
         
-        // Write video file to FFmpeg virtual filesystem
         const videoData = await fetchFile(uploadedVideo);
         await ffmpeg.writeFile('input.mp4', videoData);
         
         const newSegments = [];
-        const fixedDuration = 30; // 30 seconds for each segment
+        const fixedDuration = 30;
         
-        // Process the 4 segments (30 seconds each)
         for (let i = 0; i < 4; i++) {
           const startTime = i * fixedDuration;
           
           setMessage(`Creating segment ${i+1} of 4...`);
           
-          // Cut the segment from the original video and format for Instagram Reels (9:16 aspect ratio)
           await ffmpeg.exec([
             '-i', 'input.mp4',
             '-ss', startTime.toString(),
             '-t', fixedDuration.toString(),
-            '-vf', 'scale=-1:1080, crop=607:1080', // Crop to 607x1080 (approximately 9:16)
-            '-c:v', 'libx264', // Re-encode video
-            '-c:a', 'aac',     // Re-encode audio
+            '-vf', 'scale=-1:1080, crop=607:1080',
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
             '-pix_fmt', 'yuv420p',
-            '-preset', 'fast', // Use faster preset for quicker processing
+            '-preset', 'fast',
             `segment_${i}.mp4`
           ]);
           
-          // Read the segment file
           const data = await ffmpeg.readFile(`segment_${i}.mp4`);
           const blob = new Blob([data], { type: 'video/mp4' });
           const url = URL.createObjectURL(blob);
@@ -297,38 +284,33 @@ export default function VideoUploadPage() {
         setSegmentVideos(newSegments);
         setMessage('Video successfully split into 4 Instagram Reels (30 seconds each).');
       } else {
-        // Regular case: split into equal segments with Instagram Reels format
         const numSegments = Math.max(2, Math.ceil(videoInfo.duration / 30));
         const actualSegmentDuration = videoInfo.duration / numSegments;
         
         setMessage(`Splitting into ${numSegments} equal segments for Instagram Reels...`);
         
-        // Write video file to FFmpeg virtual filesystem
         const videoData = await fetchFile(uploadedVideo);
         await ffmpeg.writeFile('input.mp4', videoData);
         
         const newSegments = [];
         
-        // Process each segment
         for (let i = 0; i < numSegments; i++) {
           const startTime = i * actualSegmentDuration;
           
           setMessage(`Creating segment ${i+1} of ${numSegments}...`);
           
-          // Cut the segment and format for Instagram Reels
           await ffmpeg.exec([
             '-i', 'input.mp4',
             '-ss', startTime.toString(),
             '-t', actualSegmentDuration.toString(),
-            '-vf', 'scale=-1:1080, crop=607:1080', // Crop to 607x1080 (approximately 9:16)
-            '-c:v', 'libx264', // Re-encode video
-            '-c:a', 'aac',     // Re-encode audio
+            '-vf', 'scale=-1:1080, crop=607:1080',
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
             '-pix_fmt', 'yuv420p',
-            '-preset', 'fast', // Use faster preset for quicker processing
+            '-preset', 'fast',
             `segment_${i}.mp4`
           ]);
           
-          // Read the segment file
           const data = await ffmpeg.readFile(`segment_${i}.mp4`);
           const blob = new Blob([data], { type: 'video/mp4' });
           const url = URL.createObjectURL(blob);
@@ -351,90 +333,76 @@ export default function VideoUploadPage() {
       setIsProcessing(false);
     }
   };
-  
-  const downloadSegment = (index) => {
+
+  const downloadSegmentWithRemotion = async (index) => {
     if (!segmentVideos[index]) return;
-    
-    const a = document.createElement('a');
-    a.href = segmentVideos[index].url;
-    a.download = `reel_segment_${index+1}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  
+    setMessage(`Preparing to render segment ${index + 1} with subtitles...`);
+    setIsProcessing(true);
+  
+    try {
+      // Upload video segment to Supabase
+      const segment = segmentVideos[index];
+      const fileName = `segment_${index}_${Date.now()}.mp4`;
+      console.log(`Uploading segment ${index + 1} to Supabase: input/${fileName}`);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(`input/${fileName}`, await fetch(segment.url).then(res => res.blob()), {
+          contentType: 'video/mp4'
+        });
+  
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError);
+        throw new Error(`Failed to upload video to Supabase: ${uploadError.message}`);
+      }
+      console.log('Supabase upload successful:', uploadData);
+  
+      // Call server-side API to trigger workflow and download artifact
+      const response = await fetch('/api/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoPath: `input/${fileName}`,
+          subtitle: subtitles[index] || '',
+          subtitlePosition: subtitlePositions[index] || 'bottom',
+          segmentIndex: index
+        })
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to process video rendering');
+      }
+  
+      // Get the blob from the API response
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+  
+      // Trigger download
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `reel_with_subtitle_${index + 1}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+  
+      // Clean up
+      URL.revokeObjectURL(downloadUrl);
+      setMessage(`Segment ${index + 1} rendered and downloaded successfully.`);
+    } catch (error) {
+      console.error('Error in downloadSegmentWithRemotion:', error);
+      setMessage(`Error rendering video: ${error.message}`);
+      // Fallback to downloading original segment
+      const a = document.createElement('a');
+      a.href = segmentVideos[index].url;
+      a.download = `reel_segment_${index + 1}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } finally {
+      setIsProcessing(false);
+    }
   };
-
-
-  // Alternative downloadSegment function using Remotion rendering
-{/*const downloadSegmentWithRemotionRenderer = async (index) => {
-  if (!segmentVideos[index]) return;
-  
-  setMessage(`Rendering segment ${index+1} with subtitles...`);
-  setIsProcessing(true);
-  
-  try {
-    // Define a simple React component for our video composition
-    const VideoWithSubtitleComponent = () => (
-      <VideoWithSubtitle
-        videoUrl={segmentVideos[index].url}
-        subtitle={subtitles[index] || ''}
-        subtitlePosition={subtitlePositions[index] || 'bottom'}
-      />
-    );
-    
-    // Bundle the component
-    const bundled = await bundle({
-      entryPoint: VideoWithSubtitleComponent,
-    });
-    
-    // Select composition
-    const composition = await selectComposition({
-      id: 'subtitle-video',
-      component: VideoWithSubtitleComponent,
-      defaultProps: {
-        videoUrl: segmentVideos[index].url,
-        subtitle: subtitles[index] || '',
-        subtitlePosition: subtitlePositions[index] || 'bottom'
-      },
-      durationInFrames: Math.ceil(segmentVideos[index].duration * 30), // Convert seconds to frames at 30fps
-      fps: 30,
-      width: 607,
-      height: 1080
-    });
-    
-    // Render video
-    await renderMedia({
-      composition,
-      serveUrl: bundled.url,
-      codec: 'h264',
-      outputLocation: `output_${index}.mp4`,
-      onProgress: (progress) => {
-        setProgress(progress * 100);
-      },
-    });
-    
-    // Create download link
-    const a = document.createElement('a');
-    a.href = `output_${index}.mp4`;
-    a.download = `reel_with_subtitle_${index+1}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    setMessage(`Segment ${index+1} with subtitles downloaded successfully.`);
-  } catch (error) {
-    console.error('Error rendering with Remotion:', error);
-    setMessage(`Error rendering with Remotion: ${error.message}`);
-    // Fallback to downloading original segment
-    const a = document.createElement('a');
-    a.href = segmentVideos[index].url;
-    a.download = `reel_segment_${index+1}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } finally {
-    setIsProcessing(false);
-  }
-}; */}
 
   const handleSubtitleChange = (index, value) => {
     const newSubtitles = [...subtitles];
@@ -505,7 +473,6 @@ export default function VideoUploadPage() {
 
   return (
     <div className="flex h-screen bg-gray-950 text-white overflow-hidden relative">
-      {/* Animated background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 opacity-50">
         <div className="absolute top-0 left-0 w-full h-full">
           <div className="absolute top-1/4 left-1/4 w-1/2 h-1/2 bg-purple-900/10 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '15s' }}></div>
@@ -515,9 +482,7 @@ export default function VideoUploadPage() {
       
       <Particles />
 
-      {/* Enhanced Sidebar */}
       <div className={`${sidebarOpen ? 'w-72' : 'w-24'} bg-gray-900/90 backdrop-blur-md border-r border-gray-800/50 transition-all duration-300 flex flex-col z-10`}>
-        {/* Brand Header with Glass Effect */}
         <div className="py-6 border-b border-gray-800/50 transition-all">
           <div className={`px-6 flex items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
             {sidebarOpen ? (
@@ -525,7 +490,6 @@ export default function VideoUploadPage() {
                 <div className="relative w-12 h-12 mr-4 overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl shadow-lg shadow-purple-900/30 flex items-center justify-center">
                     <Video size={24} className="text-white z-10" />
-                    {/* Animated glow effect */}
                     <div className="absolute w-12 h-12 bg-white/20 rounded-full blur-lg animate-pulse"></div>
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-blue-500/40"></div>
                   </div>
@@ -539,7 +503,6 @@ export default function VideoUploadPage() {
               <div className="relative w-12 h-12 overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl shadow-lg shadow-purple-900/30 flex items-center justify-center">
                   <Video size={24} className="text-white z-10" />
-                  {/* Animated glow effect */}
                   <div className="absolute w-12 h-12 bg-white/20 rounded-full blur-lg animate-pulse"></div>
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-blue-500/40"></div>
                 </div>
@@ -554,7 +517,6 @@ export default function VideoUploadPage() {
           </div>
         </div>
         
-        {/* Navigation with enhanced visual elements */}
         <ScrollArea className="flex-1 py-6 px-4">
           <div className={`mb-8 transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
             {sidebarOpen && (
@@ -629,12 +591,10 @@ export default function VideoUploadPage() {
           {sidebarOpen && (
             <div className={`mt-8 transition-all duration-500 delay-200 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
               <div className="relative overflow-hidden rounded-2xl">
-                {/* Animated background */}
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40"></div>
                 <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-purple-500/20 rounded-full blur-xl"></div>
                 <div className="absolute -top-6 -left-6 w-24 h-24 bg-blue-500/20 rounded-full blur-xl"></div>
                 
-                {/* Card content */}
                 <div className="relative p-6 backdrop-blur-sm border border-purple-500/20 rounded-2xl">
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="p-3 bg-gradient-to-br from-purple-500/30 to-blue-500/30 rounded-xl border border-purple-500/20 shadow-inner shadow-purple-500/10">
@@ -662,10 +622,8 @@ export default function VideoUploadPage() {
           )}
         </ScrollArea>
         
-        {/* Create New Project Button */}
         <div className="p-4 border-t border-gray-800/50">
           <button className="w-full flex items-center justify-center py-4 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 group relative overflow-hidden">
-            {/* Button glow effect */}
             <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-purple-400/0 via-white/20 to-blue-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 transform -translate-x-full group-hover:translate-x-full"></div>
             
             {sidebarOpen ? (
@@ -680,13 +638,10 @@ export default function VideoUploadPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col z-10">
-        {/* Navbar */}
         <header className="bg-gray-900/70 backdrop-blur-md border-b border-gray-800/50 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-8">
-            
               <div className="hidden md:flex space-x-4">
                 <a href="#" className="text-gray-400 hover:text-white text-sm transition">Tutorials</a>
                 <a href="#" className="text-gray-400 hover:text-white text-sm transition">Templates</a>
@@ -710,7 +665,6 @@ export default function VideoUploadPage() {
                   <div className="p-2">
                     <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Profile Settings</a>
                     <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Subscription</a>
-                    <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Subscription</a>
                     <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Sign Out</a>
                   </div>
                 </div>
@@ -719,10 +673,8 @@ export default function VideoUploadPage() {
           </div>
         </header>
 
-        {/* Main Content Area */}
         <div className="flex-1 overflow-auto p-8">
           <div className="max-w-6xl mx-auto">
-            {/* Header Section */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
                 Create New Video Project
@@ -732,9 +684,7 @@ export default function VideoUploadPage() {
               </p>
             </div>
 
-            {/* Upload Options */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {/* Single Video Upload */}
               <div 
                 className={`relative border ${selectedOption === 'single' ? 'border-purple-500 bg-purple-900/10' : 'border-gray-800 hover:border-purple-400/40 hover:bg-gray-800/30'} 
                 rounded-2xl p-6 transition-all duration-300 cursor-pointer overflow-hidden group`}
@@ -760,7 +710,6 @@ export default function VideoUploadPage() {
                 </div>
               </div>
 
-              {/* Bulk Upload */}
               <div 
                 className={`relative border ${selectedOption === 'bulk' ? 'border-blue-500 bg-blue-900/10' : 'border-gray-800 hover:border-blue-400/40 hover:bg-gray-800/30'} 
                 rounded-2xl p-6 transition-all duration-300 cursor-pointer overflow-hidden group`}
@@ -787,7 +736,6 @@ export default function VideoUploadPage() {
               </div>
             </div>
 
-            {/* Upload Area */}
             {selectedOption === 'single' && (
               <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 mb-8 transition-all animate-fadeIn">
                 <div className="text-center mb-6">
@@ -795,7 +743,6 @@ export default function VideoUploadPage() {
                   <p className="text-gray-400">Select or drag and drop your video to automatically split it into Instagram Reels</p>
                 </div>
 
-                {/* Upload Zone */}
                 <div 
                   className={`border-2 border-dashed ${dragActive ? 'border-purple-500 bg-purple-900/10' : 'border-gray-700 hover:border-purple-400/40'} 
                   rounded-xl p-8 transition-all duration-300 text-center`}
@@ -854,7 +801,6 @@ export default function VideoUploadPage() {
                   )}
                 </div>
 
-                {/* Progress Indicator */}
                 {isProcessing && (
                   <div className="mt-6 animate-fadeIn">
                     <div className="flex items-center justify-between mb-2">
@@ -871,7 +817,6 @@ export default function VideoUploadPage() {
                   </div>
                 )}
 
-                {/* Video Segments Results */}
                 {segmentVideos.length > 0 && (
                   <div className="mt-8 animate-fadeIn">
                     <h3 className="text-xl font-semibold mb-4">Instagram Reels Segments</h3>
@@ -880,7 +825,6 @@ export default function VideoUploadPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {segmentVideos.map((segment, index) => (
                         <div key={index} className="border border-gray-800 rounded-xl overflow-hidden bg-gray-900/50 group">
-                          {/* Video Player with Subtitles */}
                           <div className="aspect-[9/16] relative overflow-hidden bg-black">
                             <Player
                               component={VideoWithSubtitle}
@@ -889,7 +833,7 @@ export default function VideoUploadPage() {
                                 subtitle: subtitles[index] || '',
                                 subtitlePosition: subtitlePositions[index] || 'bottom'
                               }}
-                              durationInFrames={30 * 30} // 30 seconds at 30fps
+                              durationInFrames={30 * 30}
                               compositionWidth={607}
                               compositionHeight={1080}
                               fps={30}
@@ -910,7 +854,6 @@ export default function VideoUploadPage() {
                               </span>
                             </div>
                             
-                            {/* Subtitle Editor */}
                             <div className="mb-4">
                               <label className="text-sm text-gray-400 block mb-1">Add Subtitle</label>
                               <textarea
@@ -922,7 +865,6 @@ export default function VideoUploadPage() {
                               />
                             </div>
                             
-                            {/* Subtitle Position Selector */}
                             <div className="mb-4">
                               <label className="text-sm text-gray-400 block mb-1">Subtitle Position</label>
                               <div className="flex space-x-3">
@@ -941,13 +883,12 @@ export default function VideoUploadPage() {
                               </div>
                             </div>
                             
-                            {/* Download Button */}
                             <button
-                              onClick={() => downloadSegment(index)}
+                              onClick={() => downloadSegmentWithRemotion(index)}
                               className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-lg text-white font-medium transition-all shadow-md shadow-purple-900/20 hover:shadow-purple-900/40 flex items-center justify-center"
                             >
                               <Download size={18} className="mr-2" />
-                              Download Instagram Reel
+                              Download with Subtitles
                             </button>
                           </div>
                         </div>
@@ -958,7 +899,6 @@ export default function VideoUploadPage() {
               </div>
             )}
             
-            {/* Bulk Upload Area */}
             {selectedOption === 'bulk' && (
               <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 mb-8 transition-all animate-fadeIn">
                 <div className="text-center mb-6">
@@ -983,7 +923,6 @@ export default function VideoUploadPage() {
               </div>
             )}
             
-            {/* Recent Projects */}
             <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 transition-all animate-fadeIn">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-semibold">Recent Projects</h2>

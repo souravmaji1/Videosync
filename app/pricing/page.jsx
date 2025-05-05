@@ -1,37 +1,16 @@
 'use client'
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Upload,
-  Video,
-  Scissors,
-  Folder,
-  CheckCircle,
-  ChevronDown,
-  ChevronRight,
-  Home,
-  Settings,
-  Users,
-  BarChart2,
-  HelpCircle,
-  Plus,
-  ArrowRight,
-  Sparkles,
-  Play,
-  Clock,
-  Zap,
-  BookOpen,
-  Music,
-  Cloud,
-  Download,
+  Upload, Video, Scissors, Folder, CheckCircle, ChevronDown, ChevronRight, Home, Settings, Users, 
+  BarChart2, HelpCircle, Plus, ArrowRight, Sparkles, Play, Clock, Zap, BookOpen, Music, Cloud, Download
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import BulkUpload from '@/components/bulkupload';
 import { Player } from '@remotion/player';
-import { AbsoluteFill } from 'remotion';
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video as RemotionVideo } from 'remotion';
 import { createClient } from '@supabase/supabase-js';
-import JSZip from 'jszip';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -40,19 +19,24 @@ const supabase = createClient(
 );
 
 // Subtitle Component for Remotion
-const SubtitleOverlay = ({ text, position = 'bottom' }) => {
-  const positionStyles = {
-    top: { top: '10%', bottom: 'auto' },
-    middle: { top: '50%', transform: 'translateY(-50%)' },
-    bottom: { bottom: '10%', top: 'auto' }
-  };
-  
+const SubtitleOverlay = ({ subtitles }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const activeSubtitle = subtitles.find(
+    subtitle => {
+      const startFrame = Math.floor(subtitle.start * fps);
+      const endFrame = Math.floor(subtitle.end * fps);
+      return frame >= startFrame && frame <= endFrame;
+    }
+  );
+
   const style = {
     position: 'absolute',
     left: '10%',
     right: '10%',
+    bottom: '10%',
     textAlign: 'center',
-    ...positionStyles[position],
     fontFamily: 'Arial, sans-serif',
     fontSize: '24px',
     fontWeight: 'bold',
@@ -61,21 +45,40 @@ const SubtitleOverlay = ({ text, position = 'bottom' }) => {
     padding: '10px',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: '8px',
-    zIndex: 10
+    zIndex: 10,
+    opacity: activeSubtitle ? 1 : 0,
+    transition: 'opacity 0.2s ease-in-out'
   };
-  
-  return <div style={style}>{text}</div>;
+
+  return <div style={style}>{activeSubtitle ? activeSubtitle.text : ''}</div>;
 };
 
 // Remotion Video Component
-const VideoWithSubtitle = ({ videoUrl, subtitle, subtitlePosition }) => {
+const VideoWithSubtitle = ({ videoUrl, subtitles }) => {
+  const { durationInFrames } = useVideoConfig();
+  console.log('VideoWithSubtitle rendering:', { videoUrl, durationInFrames, subtitles });
+
   return (
     <AbsoluteFill>
-      <video src={videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      <SubtitleOverlay text={subtitle} position={subtitlePosition} />
+      <RemotionVideo
+        src={videoUrl}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        muted // Required for auto-play in some browsers
+        startFrom={0}
+        endAt={durationInFrames}
+        onError={(e) => console.error('Remotion Video load error:', e)}
+      />
+      <SubtitleOverlay subtitles={subtitles} />
     </AbsoluteFill>
   );
 };
+
+// ... (Rest of the imports and component setup remain unchanged)
+
+
+
+// ... (Rest of VideoUploadPage.jsx remains unchanged)
+
 
 export default function VideoUploadPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -83,14 +86,7 @@ export default function VideoUploadPage() {
   const [dragActive, setDragActive] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [selectedNav, setSelectedNav] = useState('video-projects');
-  const recentProjects = [
-    { name: "Product Demo", date: "2 days ago", progress: 85 },
-    { name: "Promo Video", date: "1 week ago", progress: 100 },
-    { name: "Tutorial Series", date: "2 weeks ago", progress: 100 }
-  ];
-
   const [bulkUploadComplete, setBulkUploadComplete] = useState(false);
-  // Video Cutter State
   const [ffmpeg, setFFmpeg] = useState(null);
   const [isLoadingFFmpeg, setIsLoadingFFmpeg] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -100,11 +96,14 @@ export default function VideoUploadPage() {
   const [segmentVideos, setSegmentVideos] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const videoInputRef = useRef(null);
-  
-  // Subtitle state
-  const [subtitles, setSubtitles] = useState([]);
-  const [subtitlePositions, setSubtitlePositions] = useState([]);
-
+  const [segmentSubtitles, setSegmentSubtitles] = useState([]);
+  const [particleStyles, setParticleStyles] = useState([]);
+// Mock recent projects data
+const recentProjects = [
+  { name: 'Summer Campaign', date: '2023-10-15', progress: 100 },
+  { name: 'Product Launch', date: '2023-10-10', progress: 75 },
+  { name: 'Event Recap', date: '2023-10-05', progress: 100 },
+];
   // Initialize FFmpeg
   useEffect(() => {
     const loadFFmpeg = async () => {
@@ -121,8 +120,6 @@ export default function VideoUploadPage() {
           coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
           wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
         });
-
-        console.log(isLoadingFFmpeg)
 
         setFFmpeg(ffmpegInstance);
         setIsLoadingFFmpeg(false);
@@ -145,13 +142,23 @@ export default function VideoUploadPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Initialize subtitles when segments are created
+  // Initialize subtitles array when segments are created
   useEffect(() => {
     if (segmentVideos.length > 0) {
-      setSubtitles(segmentVideos.map(() => ''));
-      setSubtitlePositions(segmentVideos.map(() => 'bottom'));
+      setSegmentSubtitles(segmentVideos.map(() => []));
     }
   }, [segmentVideos]);
+
+  // Generate particle styles on client side only
+  useEffect(() => {
+    const styles = [...Array(20)].map(() => ({
+      top: `${Math.random() * 100}%`,
+      left: `${Math.random() * 100}%`,
+      animationDelay: `${Math.random() * 5}s`,
+      animation: 'float 15s infinite ease-in-out'
+    }));
+    setParticleStyles(styles);
+  }, []);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -212,14 +219,14 @@ export default function VideoUploadPage() {
         setVideoInfo(info);
         
         setSegmentVideos([]);
-        setSubtitles([]);
-        setSubtitlePositions([]);
+        setSegmentSubtitles([]);
         
         if (selectedOption === 'single') {
           if (info.duration > 30) {
             await splitVideo(info);
           } else {
-            setMessage(`Video is ${info.duration.toFixed(1)} seconds long. Video must be longer than 30 seconds to split.`);
+            setMessage(`Video is ${info.duration.toFixed(1)} seconds long. Processing as a single segment.`);
+            await splitVideo(info);
           }
         } else {
           setMessage(`Video "${file.name}" is ready for processing.`);
@@ -235,99 +242,70 @@ export default function VideoUploadPage() {
 
   const splitVideo = async (videoInfo) => {
     if (!ffmpeg || !uploadedVideo || !videoInfo) return;
-    if (videoInfo.duration <= 30) {
-      setMessage('Video must be longer than 30 seconds to split.');
-      return;
-    }
 
     setIsProcessing(true);
     setMessage('Processing video...');
     setSegmentVideos([]);
 
     try {
-      if (videoInfo.duration > 300) {
-        setMessage('Splitting into 4 segments of 30 seconds each for Instagram Reels...');
+      const segmentDuration = 30;
+      const maxSegments = Math.min(4, Math.ceil(videoInfo.duration / segmentDuration));
+      setMessage(`Splitting into ${maxSegments} segment(s) of up to 30 seconds each for Instagram Reels...`);
+      
+      const videoData = await fetchFile(uploadedVideo);
+      await ffmpeg.writeFile('input.mp4', videoData);
+      
+      const newSegments = [];
+      
+      for (let i = 0; i < maxSegments; i++) {
+        const startTime = i * segmentDuration;
+        const remainingDuration = Math.min(segmentDuration, videoInfo.duration - startTime);
+        if (remainingDuration <= 0) break;
         
-        const videoData = await fetchFile(uploadedVideo);
-        await ffmpeg.writeFile('input.mp4', videoData);
+        setMessage(`Creating segment ${i+1} of ${maxSegments}...`);
         
-        const newSegments = [];
-        const fixedDuration = 30;
+        await ffmpeg.exec([
+          '-i', 'input.mp4',
+          '-ss', startTime.toString(),
+          '-t', remainingDuration.toString(),
+          '-vf', 'scale=-1:1080, crop=607:1080',
+          '-c:v', 'libx264',
+          '-c:a', 'aac',
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          '-preset', 'fast',
+          '-f', 'mp4',
+          `segment_${i}.mp4`
+        ]);
         
-        for (let i = 0; i < 4; i++) {
-          const startTime = i * fixedDuration;
-          
-          setMessage(`Creating segment ${i+1} of 4...`);
-          
-          await ffmpeg.exec([
-            '-i', 'input.mp4',
-            '-ss', startTime.toString(),
-            '-t', fixedDuration.toString(),
-            '-vf', 'scale=-1:1080, crop=607:1080',
-            '-c:v', 'libx264',
-            '-c:a', 'aac',
-            '-pix_fmt', 'yuv420p',
-            '-preset', 'fast',
-            `segment_${i}.mp4`
-          ]);
-          
-          const data = await ffmpeg.readFile(`segment_${i}.mp4`);
-          const blob = new Blob([data], { type: 'video/mp4' });
-          const url = URL.createObjectURL(blob);
-          
-          newSegments.push({
-            url,
-            startTime,
-            duration: fixedDuration,
-            index: i
-          });
+        const data = await ffmpeg.readFile(`segment_${i}.mp4`);
+        const blob = new Blob([data.buffer], { type: 'video/mp4' });
+        console.log(`Segment ${i+1} size: ${blob.size} bytes`);
+        
+        const videoEl = document.createElement('video');
+        videoEl.src = URL.createObjectURL(blob);
+        const canPlay = await new Promise(resolve => {
+          videoEl.oncanplay = () => resolve(true);
+          videoEl.onerror = () => resolve(false);
+          videoEl.load();
+        });
+        
+        if (!canPlay) {
+          throw new Error(`Segment ${i+1} is not a valid video`);
         }
         
-        setSegmentVideos(newSegments);
-        setMessage('Video successfully split into 4 Instagram Reels (30 seconds each).');
-      } else {
-        const numSegments = Math.max(2, Math.ceil(videoInfo.duration / 30));
-        const actualSegmentDuration = videoInfo.duration / numSegments;
-        
-        setMessage(`Splitting into ${numSegments} equal segments for Instagram Reels...`);
-        
-        const videoData = await fetchFile(uploadedVideo);
-        await ffmpeg.writeFile('input.mp4', videoData);
-        
-        const newSegments = [];
-        
-        for (let i = 0; i < numSegments; i++) {
-          const startTime = i * actualSegmentDuration;
-          
-          setMessage(`Creating segment ${i+1} of ${numSegments}...`);
-          
-          await ffmpeg.exec([
-            '-i', 'input.mp4',
-            '-ss', startTime.toString(),
-            '-t', actualSegmentDuration.toString(),
-            '-vf', 'scale=-1:1080, crop=607:1080',
-            '-c:v', 'libx264',
-            '-c:a', 'aac',
-            '-pix_fmt', 'yuv420p',
-            '-preset', 'fast',
-            `segment_${i}.mp4`
-          ]);
-          
-          const data = await ffmpeg.readFile(`segment_${i}.mp4`);
-          const blob = new Blob([data], { type: 'video/mp4' });
-          const url = URL.createObjectURL(blob);
-          
-          newSegments.push({
-            url,
-            startTime,
-            duration: actualSegmentDuration,
-            index: i
-          });
-        }
-        
-        setSegmentVideos(newSegments);
-        setMessage(`Video successfully split into ${numSegments} Instagram Reels.`);
+        const url = URL.createObjectURL(blob);
+        newSegments.push({
+          url,
+          startTime,
+          duration: remainingDuration,
+          index: i
+        });
       }
+      
+      setSegmentVideos(newSegments);
+      await generateSubtitles(newSegments);
+      setMessage(`Video successfully split into ${newSegments.length} Instagram Reels with subtitles.`);
     } catch (error) {
       console.error('Error splitting video:', error);
       setMessage('Error splitting video: ' + error.message);
@@ -336,198 +314,153 @@ export default function VideoUploadPage() {
     }
   };
 
+  const generateSubtitles = async (segments) => {
+    setMessage('Uploading segments to Supabase and generating subtitles...');
+    const newSubtitles = [];
+    
+    for (const segment of segments) {
+      try {
+        const fileName = `segment_${segment.index}_${Date.now()}.mp4`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(`input/${fileName}`, await fetch(segment.url).then(res => res.blob()), {
+            contentType: 'video/mp4'
+          });
+
+        if (uploadError) {
+          console.error('Supabase upload error:', uploadError);
+          setMessage(`Failed to upload segment ${segment.index + 1}: ${uploadError.message}`);
+          newSubtitles.push([{ text: 'No audio detected', start: 0, end: segment.duration }]);
+          continue;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(`input/${fileName}`);
+        
+        const publicUrl = urlData.publicUrl;
+
+        const response = await fetch('/api/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl: publicUrl, segmentStart: segment.startTime })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Transcription error:', errorData);
+          setMessage(`Failed to transcribe segment ${segment.index + 1}`);
+          newSubtitles.push([{ text: 'Transcription failed', start: 0, end: segment.duration }]);
+          continue;
+        }
+
+        const transcription = await response.json();
+        console.log(`Transcription for segment ${segment.index + 1}:`, transcription);
+
+        let subtitles = [];
+        const utterances = transcription?.results?.channels?.[0]?.utterances;
+        const paragraphs = transcription?.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.paragraphs;
+
+        if (utterances && Array.isArray(utterances)) {
+          subtitles = utterances.map(utterance => ({
+            text: utterance.transcript,
+            start: utterance.start - segment.startTime,
+            end: utterance.end - segment.startTime
+          })).filter(sub => sub.start >= 0 && sub.end <= segment.duration);
+        } else if (paragraphs && Array.isArray(paragraphs)) {
+          subtitles = paragraphs.flatMap(paragraph =>
+            paragraph.sentences.map(sentence => ({
+              text: sentence.text,
+              start: sentence.start - segment.startTime,
+              end: sentence.end - segment.startTime
+            }))
+          ).filter(sub => sub.start >= 0 && sub.end <= segment.duration);
+        }
+
+        if (subtitles.length === 0) {
+          subtitles.push({ text: 'No audio detected', start: 0, end: segment.duration });
+        }
+
+        newSubtitles.push(subtitles);
+      } catch (error) {
+        console.error(`Error processing segment ${segment.index + 1}:`, error);
+        setMessage(`Error processing segment ${segment.index + 1}: ${error.message}`);
+        newSubtitles.push([{ text: 'Error generating subtitles', start: 0, end: segment.duration }]);
+      }
+    }
+
+    setSegmentSubtitles(newSubtitles);
+  };
+
   const downloadSegmentWithRemotion = async (index) => {
     if (!segmentVideos[index]) return;
-
+  
     setMessage(`Preparing to render segment ${index + 1} with subtitles...`);
     setIsProcessing(true);
-
+  
     try {
- 
-
-      // Upload video segment to Supabase
       const segment = segmentVideos[index];
+      const subtitles = segmentSubtitles[index] || [];
+      console.log('Sending subtitles to API:', JSON.stringify(subtitles, null, 2));
       const fileName = `segment_${index}_${Date.now()}.mp4`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(`input/${fileName}`, await fetch(segment.url).then(res => res.blob()), {
           contentType: 'video/mp4'
         });
-
-        console.log(uploadData)
-
+  
       if (uploadError) {
         throw new Error(`Failed to upload video to Supabase: ${uploadError.message}`);
       }
-
-      // Trigger GitHub Actions workflow
-      const githubToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
-      const repoOwner = 'souravmaji1';
-      const repoName = 'Videosync';
-
-      const dispatchResponse = await fetch(
-        `https://api.github.com/repos/${repoOwner}/${repoName}/dispatches`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${githubToken}`,
-            Accept: 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            event_type: 'render-video',
-            client_payload: {
-              videoPath: `input/${fileName}`,
-              subtitle: subtitles[index] || '',
-              subtitlePosition: subtitlePositions[index] || 'bottom',
-              outputFile: `rendered_${index}_${Date.now()}.mp4`
-            }
-          })
-        }
-      );
-
-      if (!dispatchResponse.ok) {
-        throw new Error('Failed to trigger GitHub Actions workflow');
-      }
-
-      setMessage(`Rendering job triggered for segment ${index + 1}. Awaiting completion...`);
-
-      // Poll GitHub Actions for workflow completion
-      let workflowRunId = null;
-      let attempts = 0;
-      const maxAttempts = 60; // 5 minutes at 5-second intervals
-
-      // Wait for the workflow to be triggered
-      while (attempts < maxAttempts) {
-        const runsResponse = await fetch(
-          `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs`,
-          {
-            headers: {
-              Authorization: `Bearer ${githubToken}`,
-              Accept: 'application/vnd.github.v3+json'
-            }
-          }
-        );
-
-        if (!runsResponse.ok) {
-          throw new Error('Failed to fetch workflow runs');
-        }
-
-        const runsData = await runsResponse.json();
-        const recentRun = runsData.workflow_runs.find(
-          run => run.event === 'repository_dispatch' && run.status !== 'completed'
-        );
-
-        if (recentRun) {
-          workflowRunId = recentRun.id;
-          break;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-        attempts++;
-      }
-
-      if (!workflowRunId) {
-        throw new Error('Workflow not triggered within timeout');
-      }
-
-      // Poll for workflow completion
-      attempts = 0;
-      while (attempts < maxAttempts) {
-        const runResponse = await fetch(
-          `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflowRunId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${githubToken}`,
-              Accept: 'application/vnd.github.v3+json'
-            }
-          }
-        );
-
-        if (!runResponse.ok) {
-          throw new Error('Failed to fetch workflow status');
-        }
-
-        const runData = await runResponse.json();
-        if (runData.status === 'completed') {
-          if (runData.conclusion !== 'success') {
-            throw new Error('Workflow failed');
-          }
-          break;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-        attempts++;
-      }
-
-      if (attempts >= maxAttempts) {
-        throw new Error('Workflow did not complete within timeout');
-      }
-
-      // Fetch artifacts
-      const artifactsResponse = await fetch(
-        `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflowRunId}/artifacts`,
-        {
-          headers: {
-            Authorization: `Bearer ${githubToken}`,
-            Accept: 'application/vnd.github.v3+json'
-          }
-        }
-      );
-
-      if (!artifactsResponse.ok) {
-        throw new Error('Failed to fetch artifacts');
-      }
-
-      const artifactsData = await artifactsResponse.json();
-      const artifact = artifactsData.artifacts.find(a => a.name === 'rendered-video');
-
-      if (!artifact) {
-        throw new Error('Rendered video artifact not found');
-      }
-
-      // Download artifact
-      const artifactResponse = await fetch(artifact.url, {
-        headers: {
-          Authorization: `Bearer ${githubToken}`,
-          Accept: 'application/vnd.github.v3+json'
-        }
+  
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(`input/${fileName}`);
+      
+      const publicUrl = urlData.publicUrl;
+      const videoPath = `input/${fileName}`;
+  
+      console.log('Sending to /api/render:', {
+        videoPath,
+        subtitles,
+        subtitlePosition: 'bottom',
+        duration: segment.duration,
+        segmentIndex: index
       });
-
-      if (!artifactResponse.ok) {
-        throw new Error('Failed to download artifact');
+  
+      const response = await fetch('/api/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoPath,
+          subtitles,
+          subtitlePosition: 'bottom',
+          duration: segment.duration,
+          segmentIndex: index
+        })
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Render-video API error:', errorData);
+        throw new Error(errorData.message || 'Failed to process video rendering');
       }
-
-      const artifactZip = await artifactResponse.arrayBuffer();
-
-      // Extract MP4 from ZIP
-      const zip = new JSZip();
-      const zipContent = await zip.loadAsync(artifactZip);
-      const mp4File = Object.values(zipContent.files).find(file => file.name.endsWith('.mp4'));
-
-      if (!mp4File) {
-        throw new Error('No MP4 file found in artifact');
-      }
-
-      const mp4Blob = await mp4File.async('blob');
-      const downloadUrl = URL.createObjectURL(mp4Blob);
-
-      // Trigger download
+  
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+  
       const a = document.createElement('a');
       a.href = downloadUrl;
       a.download = `reel_with_subtitle_${index + 1}.mp4`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
-      // Clean up
+  
       URL.revokeObjectURL(downloadUrl);
-
       setMessage(`Segment ${index + 1} rendered and downloaded successfully.`);
     } catch (error) {
-      console.error('Error rendering with Remotion:', error);
+      console.error('Error in downloadSegmentWithRemotion:', error);
       setMessage(`Error rendering video: ${error.message}`);
-      // Fallback to downloading original segment
       const a = document.createElement('a');
       a.href = segmentVideos[index].url;
       a.download = `reel_segment_${index + 1}.mp4`;
@@ -539,43 +472,25 @@ export default function VideoUploadPage() {
     }
   };
 
-  const handleSubtitleChange = (index, value) => {
-    const newSubtitles = [...subtitles];
-    newSubtitles[index] = value;
-    setSubtitles(newSubtitles);
-  };
-
-  const handleSubtitlePositionChange = (index, position) => {
-    const newPositions = [...subtitlePositions];
-    newPositions[index] = position;
-    setSubtitlePositions(newPositions);
-  };
 
   const triggerVideoInput = () => {
     videoInputRef.current?.click();
   };
 
-  // Particle effect component
   const Particles = () => {
     return (
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
+        {particleStyles.map((style, i) => (
           <div 
             key={i}
             className="absolute w-2 h-2 rounded-full bg-purple-500 opacity-20"
-            style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 5}s`,
-              animation: 'float 15s infinite ease-in-out'
-            }}
+            style={style}
           />
         ))}
       </div>
     );
   };
 
-  // Navigation item component for sidebar
   const NavItem = ({ icon, label, active, onClick }) => {
     return (
       <li>
@@ -955,7 +870,7 @@ export default function VideoUploadPage() {
                 {segmentVideos.length > 0 && (
                   <div className="mt-8 animate-fadeIn">
                     <h3 className="text-xl font-semibold mb-4">Instagram Reels Segments</h3>
-                    <p className="text-gray-400 mb-6">Your video has been split into {segmentVideos.length} Instagram Reels format clips. Add subtitles and download.</p>
+                    <p className="text-gray-400 mb-6">Your video has been split into {segmentVideos.length} Instagram Reels format clips with auto-generated subtitles.</p>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {segmentVideos.map((segment, index) => (
@@ -965,14 +880,15 @@ export default function VideoUploadPage() {
                               component={VideoWithSubtitle}
                               inputProps={{
                                 videoUrl: segment.url,
-                                subtitle: subtitles[index] || '',
-                                subtitlePosition: subtitlePositions[index] || 'bottom'
+                                subtitles: segmentSubtitles[index] || []
                               }}
-                              durationInFrames={30 * 30}
+                              durationInFrames={Math.ceil(segment.duration * 30)}
                               compositionWidth={607}
                               compositionHeight={1080}
                               fps={30}
                               controls
+                              autoPlay
+                              loop // Ensure continuous playback
                               style={{
                                 width: '100%',
                                 height: '100%'
@@ -990,37 +906,22 @@ export default function VideoUploadPage() {
                             </div>
                             
                             <div className="mb-4">
-                              <label className="text-sm text-gray-400 block mb-1">Add Subtitle</label>
-                              <textarea
-                                value={subtitles[index] || ''}
-                                onChange={(e) => handleSubtitleChange(index, e.target.value)}
-                                placeholder="Enter subtitle text..."
-                                className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                                rows={2}
-                              />
-                            </div>
-                            
-                            <div className="mb-4">
-                              <label className="text-sm text-gray-400 block mb-1">Subtitle Position</label>
-                              <div className="flex space-x-3">
-                                {['top', 'middle', 'bottom'].map((position) => (
-                                  <button
-                                    key={position}
-                                    onClick={() => handleSubtitlePositionChange(index, position)}
-                                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all
-                                      ${subtitlePositions[index] === position 
-                                        ? 'bg-purple-600 text-white' 
-                                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-                                  >
-                                    {position.charAt(0).toUpperCase() + position.slice(1)}
-                                  </button>
-                                ))}
+                              <label className="text-sm text-gray-400 block mb-1">Subtitles</label>
+                              <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-gray-300 h-20 overflow-auto">
+                                {segmentSubtitles[index]?.length > 0 ? (
+                                  segmentSubtitles[index].map((sub, i) => (
+                                    <div key={i}>{`${sub.start.toFixed(1)}s - ${sub.end.toFixed(1)}s: ${sub.text}`}</div>
+                                  ))
+                                ) : (
+                                  <span className="text-gray-500">No subtitles generated</span>
+                                )}
                               </div>
                             </div>
                             
                             <button
                               onClick={() => downloadSegmentWithRemotion(index)}
                               className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-lg text-white font-medium transition-all shadow-md shadow-purple-900/20 hover:shadow-purple-900/40 flex items-center justify-center"
+                              disabled={isProcessing}
                             >
                               <Download size={18} className="mr-2" />
                               Download with Subtitles
@@ -1106,3 +1007,4 @@ export default function VideoUploadPage() {
     </div>
   );
 }
+

@@ -1,47 +1,184 @@
-// app/api/render/route.js
-import { renderMediaOnLambda } from '@remotion/lambda-client';
+import JSZip from 'jszip';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const { videoUrl, subtitle, subtitlePosition } = await request.json();
+    const { videoPath, subtitles, subtitlePosition, segmentIndex, duration } = await request.json();
+    console.log('Render-video API received:', { videoPath, subtitles, subtitlePosition, segmentIndex, duration });
 
-    // Start the render on Lambda
-    const { renderId, bucketName } = await renderMediaOnLambda({
-      region: 'us-east-1',
-      functionName: 'remotion-render',
-      serveUrl: process.env.REMOTION_SERVE_URL || 'your-serve-url',
-      composition: {
-        id: 'SubtitleVideo',
-        durationInFrames: Math.ceil(30 * 30), // 30 seconds at 30fps
-        fps: 30,
-        width: 607,
-        height: 1080,
-        defaultProps: {
-          videoUrl,
-          subtitle,
-          subtitlePosition
+    if (!videoPath || !duration) {
+      return NextResponse.json({ error: 'Video path and duration are required' }, { status: 400 });
+    }
+
+    if (!subtitles || !Array.isArray(subtitles) || subtitles.some(s => !s.text || !s.start || !s.end)) {
+      console.warn('Invalid subtitles format, using empty array:', subtitles);
+    }
+
+    const props = {
+      videoPath,
+      subtitles: subtitles && Array.isArray(subtitles) ? subtitles : [],
+      subtitlePosition: subtitlePosition || 'bottom',
+      duration,
+      outputFile: `rendered_${segmentIndex}_${Date.now()}.mp4`
+    };
+    console.log('Dispatching workflow with props:', JSON.stringify(props));
+
+    const githubToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
+    const repoOwner = 'souravmaji1';
+    const repoName = 'Videosync';
+
+    // Step 1: Trigger GitHub Actions workflow
+    const dispatchResponse = await fetch(
+      `https://api.github.com/repos/${repoOwner}/${repoName}/dispatches`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${githubToken}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          event_type: 'render-video',
+          client_payload: props
+        })
+      }
+    );
+
+    if (!dispatchResponse.ok) {
+      const errorData = await dispatchResponse.json();
+      throw new Error(`Failed to trigger workflow: ${errorData.message}`);
+    }
+
+    // Step 2: Poll for workflow completion
+    let workflowRunId = null;
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    while (attempts < maxAttempts) {
+      const runsResponse = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs`,
+        {
+          headers: {
+            Authorization: `Bearer ${githubToken}`,
+            Accept: 'application/vnd.github.v3+json'
+          }
         }
-      },
-      inputProps: {
-        videoUrl,
-        subtitle,
-        subtitlePosition
-      },
-      codec: 'h264',
-      maxRetries: 1,
+      );
+
+      if (!runsResponse.ok) {
+        throw new Error('Failed to fetch workflow runs');
+      }
+
+      const runsData = await runsResponse.json();
+      const recentRun = runsData.workflow_runs.find(
+        run => run.event === 'repository_dispatch' && run.status !== 'completed'
+      );
+
+      if (recentRun) {
+        workflowRunId = recentRun.id;
+        console.log('Workflow triggered, run ID:', workflowRunId);
+        break;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      attempts++;
+    }
+
+    if (!workflowRunId) {
+      throw new Error('Workflow not triggered within timeout');
+    }
+
+    // Poll for workflow completion
+    attempts = 0;
+    while (attempts < maxAttempts) {
+      const runResponse = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflowRunId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${githubToken}`,
+            Accept: 'application/vnd.github.v3+json'
+          }
+        }
+      );
+
+      if (!runResponse.ok) {
+        throw new Error('Failed to fetch workflow status');
+      }
+
+      const runData = await runResponse.json();
+      if (runData.status === 'completed') {
+        if (runData.conclusion !== 'success') {
+          throw new Error(`Workflow failed: ${runData.conclusion}`);
+        }
+        break;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      attempts++;
+    }
+
+    if (attempts >= maxAttempts) {
+      throw new Error('Workflow did not complete within timeout');
+    }
+
+    // Step 3: Fetch artifacts
+    const artifactsResponse = await fetch(
+      `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflowRunId}/artifacts`,
+      {
+        headers: {
+          Authorization: `Bearer ${githubToken}`,
+          Accept: 'application/vnd.github.v3+json'
+        }
+      }
+    );
+
+    if (!artifactsResponse.ok) {
+      throw new Error('Failed to fetch artifacts');
+    }
+
+    const artifactsData = await artifactsResponse.json();
+    const artifact = artifactsData.artifacts.find(a => a.name === 'rendered-video');
+
+    if (!artifact) {
+      throw new Error('Rendered video artifact not found');
+    }
+
+    // Step 4: Download artifact ZIP using archive_download_url
+    const artifactResponse = await fetch(artifact.archive_download_url, {
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        Accept: 'application/vnd.github.v3+json'
+      }
     });
 
-    // Return the render ID and bucket name to poll progress
-    return NextResponse.json({ renderId, bucketName });
+    if (!artifactResponse.ok) {
+      throw new Error(`Failed to download artifact: ${artifactResponse.statusText}`);
+    }
+
+    const artifactZip = await artifactResponse.arrayBuffer();
+
+    // Step 5: Extract MP4 from ZIP
+    const zip = new JSZip();
+    const zipContent = await zip.loadAsync(artifactZip);
+    const mp4File = Object.values(zipContent.files).find(file => file.name.endsWith('.mp4'));
+
+    if (!mp4File) {
+      throw new Error('No MP4 file found in artifact ZIP');
+    }
+
+    const mp4Blob = await mp4File.async('blob');
+    const mp4ArrayBuffer = await mp4Blob.arrayBuffer();
+
+    // Step 6: Return the MP4 file as a response with appropriate headers
+    return new NextResponse(mp4ArrayBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'video/mp4',
+        'Content-Disposition': `attachment; filename=reel_with_subtitle_${segmentIndex + 1}.mp4`
+      }
+    });
   } catch (error) {
-    console.error('Lambda render error:', error);
-    return NextResponse.json(
-      {
-        error: 'Failed to start render',
-        details: error instanceof Error ? error.message : String(error)
-      },
-      { status: 500 }
-    );
+    console.error('Error in render-video API:', error);
+    return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }

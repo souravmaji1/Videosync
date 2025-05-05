@@ -23,7 +23,6 @@ jobs:
       - name: Install FFmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-
       - name: Download Video from Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -32,24 +31,27 @@ jobs:
           VIDEO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
           echo "Downloading video from $VIDEO_URL"
           curl -L -o input.mp4 "$VIDEO_URL" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             --fail --silent --show-error
           if [ $? -ne 0 ]; then
             echo "Error: Failed to download video from Supabase"
             exit 1
           fi
           ls -l input.mp4  # Verify the file exists
+
       - name: Render Video with Remotion
         env:
-          SUBTITLE: ${{ github.event.client_payload.subtitle }}
+          SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
           SUBTITLE_POSITION: ${{ github.event.client_payload.subtitlePosition }}
           OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
+          VIDEO_PATH: "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
         run: |
-          VIDEO_PATH="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
+          echo "Subtitles received: $SUBTITLES"
           npx remotion render VideoWithSubtitles \
-            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"subtitle\": \"$SUBTITLE\", \"subtitlePosition\": \"$SUBTITLE_POSITION\"}" \
-            --output="$SUBTITLE_POSITION.mp4"
-         
+            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"subtitles\": $SUBTITLES, \"subtitlePosition\": \"$SUBTITLE_POSITION\"}" \
+            --output="$OUTPUT_FILE"
+          ls -l "$OUTPUT_FILE"  # Verify the output file exists
+
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4
         with:

@@ -23,7 +23,7 @@ export async function POST(request) {
     };
     console.log('Dispatching workflow with props:', JSON.stringify(props));
 
-    const githubToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
+    const githubToken = "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";
     const repoOwner = 'souravmaji1';
     const repoName = 'Videosync';
 

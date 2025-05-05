@@ -50,7 +50,7 @@ jobs:
           npx remotion render VideoWithSubtitles \
             --props "{\"videoUrl\": \"$VIDEO_PATH\", \"subtitles\": $SUBTITLES, \"subtitlePosition\": \"$SUBTITLE_POSITION\"}" \
             --output="$SUBTITLE_POSITION.mp4"
-          ls -l "$OUTPUT_FILE"  # Verify the output file exists
+        
 
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4

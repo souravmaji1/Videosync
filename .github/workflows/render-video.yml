@@ -15,32 +15,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.18.0'
-          cache: 'npm'
+          node-version: '18'
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Install FFmpeg, jq, and Fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg jq fonts-liberation
-          fc-list | grep -i liberation
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Log Environment
-        run: |
-          node --version
-          npm list remotion
-          ffmpeg -version
-
-      - name: Debug Payload
-        env:
-          PAYLOAD: ${{ toJson(github.event.client_payload) }}
-        run: |
-          echo "Client payload: $PAYLOAD"
-          echo "Subtitles: ${{ github.event.client_payload.subtitles }}"
-          echo "Duration: ${{ github.event.client_payload.duration }}"
-          echo "VideoPath: ${{ github.event.client_payload.videoPath }}"
 
       - name: Download Video from Supabase
         env:
@@ -56,72 +38,21 @@ jobs:
             echo "Error: Failed to download video from Supabase"
             exit 1
           fi
-          ls -l input.mp4
-          file input.mp4
-          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 input.mp4
-          if [ $? -ne 0 ]; then
-            echo "Error: Downloaded file is not a valid video"
-            exit 1
-          fi
-
+          ls -l input.mp4  # Verify the file exists
       - name: Render Video with Remotion
         env:
-          SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
+          SUBTITLE: ${{ github.event.client_payload.subtitle }}
           SUBTITLE_POSITION: ${{ github.event.client_payload.subtitlePosition }}
-          DURATION: ${{ github.event.client_payload.duration }}
-          VIDEO_PATH: https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}
+          OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
         run: |
-          if [ -z "$SUBTITLES" ] || [ "$SUBTITLES" = "[]" ]; then
-            echo "Error: No subtitles provided"
-            exit 1
-          fi
-          # Log subtitles for debugging
-          echo "Subtitles JSON: $SUBTITLES"
-          # Display subtitles in a formatted way before rendering
-          echo "Subtitles to be rendered:"
-          echo "$SUBTITLES" | jq -r '.[] | "  - Text: \(.text), Start: \(.start)s, End: \(.end)s"'
-          # Create props JSON with correct structure
-          PROPS=$(jq -n \
-            --arg videoUrl "$VIDEO_PATH" \
-            --argjson subtitles "$SUBTITLES" \
-            --arg subtitlePosition "$SUBTITLE_POSITION" \
-            --argjson duration "$DURATION" \
-            '{videoUrl: $videoUrl, subtitles: $subtitles, subtitlePosition: $subtitlePosition, duration: $duration}')
-          echo "$PROPS" > props.json
-          jq . props.json > /dev/null 2>&1
-          if [ $? -ne 0 ]; then
-            echo "Error: Invalid PROPS JSON"
-            exit 1
-          fi
-          # Log props for debugging
-          echo "Props JSON:"
-          cat props.json
-          # Render video with verbose logging
+          VIDEO_PATH="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
           npx remotion render VideoWithSubtitles \
-            --props-file props.json \
-            --output rendered-video.mp4 \
-            --log=verbose 2>&1 | tee remotion.log
-          # Check if output file exists and is valid
-          ls -l rendered-video.mp4
-          if [ ! -s rendered-video.mp4 ]; then
-            echo "Error: Rendered video file is empty or not created"
-            exit 1
-          fi
-          # Verify video duration
-          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 rendered-video.mp4
-          mkdir -p logs
-          mv remotion.log logs/
-
+            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"subtitle\": \"$SUBTITLE\", \"subtitlePosition\": \"$SUBTITLE_POSITION\"}" \
+            --output="$SUBTITLE_POSITION.mp4"
+         
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: rendered-video
           path: "*.mp4"
-          retention-days: 7
-
-      - name: Upload Remotion Logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: remotion-logs
-          path: logs/
           retention-days: 7

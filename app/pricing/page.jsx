@@ -120,7 +120,7 @@ const recentProjects = [
           coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
           wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
         });
-
+       console.log(isLoadingFFmpeg)
         setFFmpeg(ffmpegInstance);
         setIsLoadingFFmpeg(false);
       } catch (error) {
@@ -326,7 +326,7 @@ const recentProjects = [
           .upload(`input/${fileName}`, await fetch(segment.url).then(res => res.blob()), {
             contentType: 'video/mp4'
           });
-
+    console.log(uploadData)
         if (uploadError) {
           console.error('Supabase upload error:', uploadError);
           setMessage(`Failed to upload segment ${segment.index + 1}: ${uploadError.message}`);
@@ -408,7 +408,7 @@ const recentProjects = [
         .upload(`input/${fileName}`, await fetch(segment.url).then(res => res.blob()), {
           contentType: 'video/mp4'
         });
-  
+     console.log(uploadData)
       if (uploadError) {
         throw new Error(`Failed to upload video to Supabase: ${uploadError.message}`);
       }
@@ -418,6 +418,7 @@ const recentProjects = [
         .getPublicUrl(`input/${fileName}`);
       
       const publicUrl = urlData.publicUrl;
+      console.log(publicUrl)
       const videoPath = `input/${fileName}`;
   
       console.log('Sending to /api/render:', {

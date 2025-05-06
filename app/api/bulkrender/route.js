@@ -17,7 +17,7 @@ export async function POST(request) {
     }
 
     const validStyles = ['none', 'hormozi', 'abdaal', 'neonGlow', 'retroWave', 'minimalPop'];
-    const githubToken = '';
+    const githubToken = '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';
     const repoOwner = 'souravmaji1';
     const repoName = 'Videosync';
     const workflowIds = [];

@@ -50,7 +50,13 @@ export default function VideoLibraryPage() {
           return;
         }
 
-        setVideos(videoData || []);
+        // Ensure all videos have a name
+        const sanitizedVideos = (videoData || []).map(video => ({
+          ...video,
+          name: video.name || `Untitled Video ${video.id || Date.now()}`
+        }));
+
+        setVideos(sanitizedVideos);
 
         // Fetch render workflows
         const { data: workflowData, error: workflowError } = await supabase
@@ -79,7 +85,7 @@ export default function VideoLibraryPage() {
   useEffect(() => {
     if (!renderWorkflows.length) return;
 
-    const githubToken = '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';
+    const githubToken = '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';
     const repoOwner = 'souravmaji1';
     const repoName = 'Videosync';
 
@@ -101,7 +107,7 @@ export default function VideoLibraryPage() {
           );
 
           if (!response.ok) {
-            console.error(`Failed to fetch workflow ${workflow.workflow_id} status`);
+            console.error(`Failed to fetch workflow ${workflow.workflow_id} status: ${response.statusText}`);
             continue;
           }
 
@@ -166,13 +172,14 @@ export default function VideoLibraryPage() {
                         updateData.video_url = urlData.publicUrl;
                         updateData.duration = workflow.duration;
 
-                        // Add to user_videos
+                        // Add to user_videos with a guaranteed name
+                        const videoName = `Rendered Segment ${workflow.segment_index + 1}`;
                         const { error: videoInsertError } = await supabase
                           .from('user_videos')
                           .insert({
                             user_id: user.id,
                             video_url: urlData.publicUrl,
-                            name: `Rendered Segment ${workflow.segment_index + 1}`,
+                            name: videoName,
                             created_at: new Date().toISOString(),
                             duration: workflow.duration
                           });
@@ -183,18 +190,24 @@ export default function VideoLibraryPage() {
                           setVideos(prev => [{
                             user_id: user.id,
                             video_url: urlData.publicUrl,
-                            name: `Rendered Segment ${workflow.segment_index + 1}`,
+                            name: videoName,
                             created_at: new Date().toISOString(),
                             duration: workflow.duration
                           }, ...prev]);
                         }
                       }
                     }
+                  } else {
+                    console.error(`Failed to download artifact for workflow ${workflow.workflow_id}: ${downloadResponse.statusText}`);
+                    newStatus = 'failed';
                   }
                 } else {
                   console.error(`No rendered-video artifact found for workflow ${workflow.workflow_id}`);
                   newStatus = 'failed';
                 }
+              } else {
+                console.error(`Failed to fetch artifacts for workflow ${workflow.workflow_id}: ${artifactsResponse.statusText}`);
+                newStatus = 'failed';
               }
             }
 
@@ -285,9 +298,11 @@ export default function VideoLibraryPage() {
     if (filter === 'all') return true;
     if (filter === 'youtube' && video.video_url.includes('youtube')) return true;
     return false;
-  }).filter(video =>
-    video.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  }).filter(video => {
+    const videoName = (video.name || '').toLowerCase();
+    const query = (searchQuery || '').toLowerCase();
+    return videoName.includes(query);
+  });
 
   const NavItem = ({ icon, label, active, onClick }) => (
     <li>

@@ -1,25 +1,7 @@
 import { AbsoluteFill, Composition, useVideoConfig, Video as RemotionVideo } from 'remotion';
 import SubtitleOverlay from '../components/SubtitleOverlay';
 
-interface Subtitle {
-  text: string;
-  start: number;
-  end: number;
-}
-
-interface VideoCompositionProps {
-  videoUrl: string;
-  subtitles: Subtitle[];
-  styleType: 'hormozi' | 'abdaal' | 'neonGlow' | 'retroWave' | 'minimalPop' | 'none';
-  duration: number; // Duration in seconds
-}
-
-export const VideoComposition = ({
-  videoUrl,
-  subtitles,
-  styleType,
-  duration
-}: VideoCompositionProps) => {
+export const VideoComposition = ({ videoUrl, subtitles, styleType, duration }) => {
   const { width, height, fps, durationInFrames } = useVideoConfig();
   const expectedDurationInFrames = Math.ceil(duration * fps);
 
@@ -38,7 +20,6 @@ export const VideoComposition = ({
       <RemotionVideo
         src={videoUrl}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        muted // Required for auto-play in some browsers
         startFrom={0}
         endAt={durationInFrames}
         onError={(e) => console.error('Remotion Video load error:', e)}
@@ -53,7 +34,7 @@ export const RemotionComposition = () => {
     <Composition
       id="VideoWithSubtitles"
       component={VideoComposition}
-      durationInFrames={30 * 30} // Default, overridden by props
+      durationInFrames={30 * 30}
       fps={30}
       width={606}
       height={1080}

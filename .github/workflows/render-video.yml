@@ -31,7 +31,7 @@ jobs:
           VIDEO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
           echo "Downloading video from $VIDEO_URL"
           curl -L -o input.mp4 "$VIDEO_URL" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwG" \
             --fail --silent --show-error
           if [ $? -ne 0 ]; then
             echo "Error: Failed to download video from Supabase"

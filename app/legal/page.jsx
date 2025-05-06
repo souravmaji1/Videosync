@@ -1,1125 +1,1382 @@
 'use client'
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { 
-  Play, 
-  ChevronDown, 
-  ArrowRight,
-  Package as Instagram,
-  MSquare as Youtube,
-  Magnet as TikTok,
-  GlassWater as Twitter,
-  PackageCheck as Facebook,
-
-  MessageCircle,
-  ArrowUpCircle,
-  ClockIcon,
-  BrainIcon,
-  TextIcon,
-  CalendarSearch as CalendarIcon,
-  BarChart2,
-
-  Users,
-  Smartphone,
-
-  Zap,
-  CheckCircle,
-  Clock,
-  Star,
-
-  Sparkles,
-  Rocket,
-  Command,
-  Layers,
-  Video,
-  PenTool,
-  Palette
-
+  Upload, Video, Scissors, Folder, CheckCircle, ChevronDown, ChevronRight, Home, Settings, Users, 
+  BarChart2, HelpCircle, Plus, ArrowRight, Sparkles, Clock, Zap, BookOpen, Music, Cloud, Download, Play
 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import BulkUpload from '@/components/bulkupload';
+import { Player } from '@remotion/player';
+import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video as RemotionVideo } from 'remotion';
+import { createClient } from '@supabase/supabase-js';
+import { motion } from 'framer-motion';
 
-export default function Home() {
-  const [openFaq, setOpenFaq] = useState(null);
-  const [activeTab, setActiveTab] = useState('features');
-  const [scrolled, setScrolled] = useState(false);
-  const [animateStats, setAnimateStats] = useState(false);
-  
-  // Handle scroll effects
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+// Subtitle Component for Remotion
+const SubtitleOverlay = ({ subtitles, styleType }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const activeSubtitle = subtitles.find(
+    subtitle => {
+      const startFrame = Math.floor(subtitle.start * fps);
+      const endFrame = Math.floor(subtitle.end * fps);
+      return frame >= startFrame && frame <= endFrame;
+    }
+  );
+
+  const styles = {
+    hormozi: {
+      position: 'absolute',
+      left: '10%',
+      right: '10%',
+      bottom: '10%',
+      textAlign: 'center',
+      fontFamily: 'Impact, Arial, sans-serif',
+      fontSize: '36px',
+      fontWeight: '900',
+      color: 'white',
+      textTransform: 'uppercase',
+      textShadow: '0 4px 6px rgba(0, 0, 0, 0.8)',
+      padding: '15px 20px',
+      backgroundColor: 'rgba(0, 0, 0, 0.9)',
+      borderRadius: '12px',
+      border: '4px solid #FFD700',
+      zIndex: 10,
+      opacity: activeSubtitle ? 1 : 0,
+      transition: 'opacity 0.2s ease-in-out'
+    },
+    abdaal: {
+      position: 'absolute',
+      left: '10%',
+      right: '10%',
+      bottom: '10%',
+      textAlign: 'center',
+      fontFamily: 'Helvetica, Arial, sans-serif',
+      fontSize: '28px',
+      fontWeight: '600',
+      color: '#F5F5F5',
+      textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
+      padding: '10px 15px',
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      borderRadius: '10px',
+      border: '2px solid #FFFFFF',
+      zIndex: 10,
+      opacity: activeSubtitle ? 1 : 0,
+      transition: 'opacity 0.2s ease-in-out'
+    },
+    neonGlow: {
+      position: 'absolute',
+      left: '10%',
+      right: '10%',
+      bottom: '10%',
+      textAlign: 'center',
+      fontFamily: '"Orbitron", Arial, sans-serif',
+      fontSize: '32px',
+      fontWeight: '700',
+      color: '#00FFDD',
+      textShadow: '0 0 8px #00FFDD, 0 0 16px #00FFDD, 0 0 24px #FF00FF',
+      padding: '12px 18px',
+      background: 'linear-gradient(45deg, rgba(255, 0, 255, 0.2), rgba(0, 255, 221, 0.2))',
+      borderRadius: '10px',
+      border: '2px solid #FF00FF',
+      zIndex: 10,
+      opacity: activeSubtitle ? 1 : 0,
+      transition: 'opacity 0.3s ease-in-out',
+      animation: activeSubtitle ? 'neonFlicker 1.5s infinite alternate' : 'none'
+    },
+    retroWave: {
+      position: 'absolute',
+      left: '10%',
+      right: '10%',
+      bottom: '10%',
+      textAlign: 'center',
+      fontFamily: '"VCR OSD Mono", monospace',
+      fontSize: '30px',
+      fontWeight: '400',
+      color: '#FF69B4',
+      textShadow: '0 0 10px #FF1493, 0 0 20px #9400D3',
+      padding: '10px 15px',
+      background: 'rgba(0, 0, 0, 0.7)',
+      borderRadius: '8px',
+      border: '3px double #00FFFF',
+      zIndex: 10,
+      opacity: activeSubtitle ? 1 : 0,
+      transition: 'opacity 0.2s ease-in-out',
+      filter: 'contrast(1.2)',
+      letterSpacing: '2px'
+    },
+    minimalPop: {
+      position: 'absolute',
+      left: '10%',
+      right: '10%',
+      bottom: '10%',
+      textAlign: 'center',
+      fontFamily: '"Poppins", Arial, sans-serif',
+      fontSize: '28px',
+      fontWeight: '500',
+      color: '#FFFFFF',
+      textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+      padding: '8px 12px',
+      background: 'linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%)',
+      borderRadius: '12px',
+      border: 'none',
+      zIndex: 10,
+      opacity: activeSubtitle ? 1 : 0,
+      transition: 'opacity 0.3s ease-in-out, transform 0.2s ease-in-out',
+      transform: activeSubtitle ? 'scale(1)' : 'scale(0.95)'
+    },
+    none: {
+      position: 'absolute',
+      left: '10%',
+      right: '10%',
+      bottom: '10%',
+      textAlign: 'center',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '24px',
+      fontWeight: 'bold',
+      color: 'white',
+      textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)',
+      padding: '10px',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      borderRadius: '8px',
+      zIndex: 10,
+      opacity: activeSubtitle ? 1 : 0,
+      transition: 'opacity 0.2s ease-in-out'
+    }
+  };
+
+  return <div style={styles[styleType] || styles.none}>{activeSubtitle ? activeSubtitle.text : ''}</div>;
+};
+
+// Remotion Video Component
+const VideoWithSubtitle = ({ videoUrl, subtitles, styleType }) => {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+
+  return (
+    <AbsoluteFill>
+      <RemotionVideo
+        src={videoUrl}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        startFrom={0}
+        endAt={durationInFrames}
+        onError={(e) => console.error('Main video load error:', e)}
+      />
+      <SubtitleOverlay subtitles={subtitles} styleType={styleType} />
+    </AbsoluteFill>
+  );
+};
+
+// Animation variants for the upload section
+const pulseAnimation = {
+  scale: [1, 1.03, 1],
+  transition: {
+    duration: 2,
+    repeat: Infinity,
+    repeatType: "reverse",
+  }
+};
+
+export default function VideoUploadPage() {
+  const { user } = useUser();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedNav, setSelectedNav] = useState('video-projects');
+  const [bulkUploadComplete, setBulkUploadComplete] = useState(false);
+  const [ffmpeg, setFFmpeg] = useState(null);
+  const [isLoadingFFmpeg, setIsLoadingFFmpeg] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState('');
+  const [uploadedVideo, setUploadedVideo] = useState(null);
+  const [videoInfo, setVideoInfo] = useState(null);
+  const [segmentVideos, setSegmentVideos] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const videoInputRef = useRef(null);
+  const [segmentSubtitles, setSegmentSubtitles] = useState([]);
+  const [subtitleStyles, setSubtitleStyles] = useState([]);
+  const [particleStyles, setParticleStyles] = useState([]);
+  const [isGeneratingSubtitles, setIsGeneratingSubtitles] = useState([]);
+  const [editingSegmentIndex, setEditingSegmentIndex] = useState(null);
+  const [newSubtitle, setNewSubtitle] = useState({ text: '', start: '', end: '' });
+
+  // Mock recent projects data
+  const recentProjects = [
+    { name: 'Summer Campaign', date: '2023-10-15', progress: 100 },
+    { name: 'Product Launch', date: '2023-10-10', progress: 75 },
+    { name: 'Event Recap', date: '2023-10-05', progress: 100 },
+  ];
+
+  // Initialize FFmpeg
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 50) {
-        setScrolled(true);
-      } else {
-        setScrolled(false);
-      }
+    const loadFFmpeg = async () => {
+      try {
+        setIsLoadingFFmpeg(true);
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        const ffmpegInstance = new FFmpeg();
+        
+        ffmpegInstance.on('progress', ({ progress }) => {
+          setProgress(progress * 100);
+        });
 
-      // Trigger stats animation when scrolled to that section
-      const statsSection = document.getElementById('stats-section');
-      if (statsSection && window.scrollY + window.innerHeight > statsSection.offsetTop) {
-        setAnimateStats(true);
+        await ffmpegInstance.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+        console.log('FFmpeg loaded');
+        setFFmpeg(ffmpegInstance);
+        setIsLoadingFFmpeg(false);
+      } catch (error) {
+        console.error('Error loading FFmpeg:', error);
+        setMessage('Failed to load FFmpeg');
+        setIsLoadingFFmpeg(false);
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    if (selectedOption === 'single' && !ffmpeg) {
+      loadFFmpeg();
+    }
+  }, [selectedOption]);
+
+  // Animation effect on mount
+  useEffect(() => {
+    setIsAnimating(true);
+    const timer = setTimeout(() => setIsAnimating(false), 1000);
+    return () => clearTimeout(timer);
   }, []);
-  
-  const toggleFaq = (index) => {
-    if (openFaq === index) {
-      setOpenFaq(null);
+
+  // Initialize subtitles, subtitle styles, and subtitle generation status arrays when segments are created
+  useEffect(() => {
+    if (segmentVideos.length > 0) {
+      setSegmentSubtitles(segmentVideos.map(() => []));
+      setSubtitleStyles(segmentVideos.map(() => 'none'));
+      setIsGeneratingSubtitles(segmentVideos.map(() => false));
     } else {
-      setOpenFaq(index);
+      setSegmentSubtitles([]);
+      setSubtitleStyles([]);
+      setIsGeneratingSubtitles([]);
+    }
+  }, [segmentVideos]);
+
+  // Generate particle styles
+  useEffect(() => {
+    const styles = [...Array(20)].map(() => ({
+      top: `${Math.random() * 100}%`,
+      left: `${Math.random() * 100}%`,
+      animationDelay: `${Math.random() * 5}s`,
+      animation: 'float 15s infinite ease-in-out'
+    }));
+    setParticleStyles(styles);
+  }, []);
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleVideoUpload({ target: { files: e.dataTransfer.files } });
     }
   };
 
-  const faqs = [
-    {
-      question: "How does VideoSync revolutionize multi-platform posting?",
-      answer: "VideoSync uses cutting-edge AI to transform one video into multiple platform-perfect clips. Our technology analyzes your content, identifies the most engaging segments, and automatically optimizes them for each platform's specific requirements and audience preferences."
-    },
-    {
-      question: "What makes VideoSync different from other video tools?",
-      answer: "Unlike basic editing tools, VideoSync combines AI-powered editing, smart framing, automated captions, and cross-platform distribution in one seamless workflow. Our virality prediction algorithm also helps you optimize content for maximum engagement before you even publish."
-    },
-    {
-      question: "Can I customize the AI's decisions?",
-      answer: "Absolutely! While our AI makes intelligent suggestions, you have complete creative control. Adjust clip selection, customize captions, add your branding, and fine-tune every aspect before publishing. The AI learns from your preferences over time."
-    },
-    {
-      question: "How much time will VideoSync save me?",
-      answer: "Our users report saving 70-80% of their content creation time. What used to take hours of editing and reformatting now happens in minutes, allowing you to focus on creating great content rather than technical adjustments."
-    },
-    {
-      question: "Which platforms does VideoSync support?",
-      answer: "We support all major platforms including TikTok, YouTube, Instagram, Facebook, Twitter, LinkedIn, Pinterest, and Snapchat. Our platform continuously adapts to changing platform requirements and new emerging social networks."
-    },
-    {
-      question: "Is there a limit to how many videos I can process?",
-      answer: "Free accounts can process up to 5 videos per month with basic features. Our premium plans offer unlimited videos, advanced AI tools, priority processing, and complete analytics. Enterprise plans include custom solutions for teams and agencies."
-    },
-  ];
-
-  const featuresData = {
-    features: [
-      {
-        title: "Neural Clip Detection",
-        description: "Our advanced AI identifies the most engaging moments from your videos using attention mapping technology that predicts viewer engagement.",
-        icon: <Sparkles className="text-purple-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-purple-900 to-indigo-900"
-      },
-      {
-        title: "Dynamic Captions",
-        description: "Eye-catching animated captions with custom styles that follow your speech perfectly and automatically adapt to each platform's requirements.",
-        icon: <MessageCircle className="text-blue-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-blue-900 to-cyan-900"
-      },
-      {
-        title: "Intelligent Framing",
-        description: "Smart reframing that keeps important subjects centered regardless of aspect ratio, ensuring your content looks perfect everywhere.",
-        icon: <Smartphone className="text-teal-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-teal-900 to-emerald-900"
+  const handleVideoUpload = async (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      if (!file.type.startsWith('video/')) {
+        setMessage('Please upload a valid video file.');
+        return;
       }
-    ],
-    creative: [
-      {
-        title: "AI Scene Enhancement",
-        description: "Automatically generate complementary B-Roll footage and visual elements that enhance your storytelling and maintain viewer attention.",
-        icon: <Video className="text-rose-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-rose-900 to-pink-900"
-      },
-      {
-        title: "Brand Identity System",
-        description: "Create a consistent visual identity with custom intros, outros, overlays, and color schemes that automatically apply to all your content.",
-        icon: <Palette className="text-amber-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-amber-900 to-orange-900"
-      },
-      {
-        title: "Creative Enhancement",
-        description: "AI-powered tools that suggest visual improvements, transitions, and effects specific to your content type and target audience.",
-        icon: <PenTool className="text-green-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-green-900 to-lime-900"
+      
+      setMessage('Analyzing video...');
+      
+      try {
+        const videoEl = document.createElement('video');
+        videoEl.preload = 'metadata';
+        
+        const metadataLoaded = new Promise((resolve) => {
+          videoEl.onloadedmetadata = () => resolve(videoEl);
+        });
+        
+        videoEl.src = URL.createObjectURL(file);
+        
+        const loadedVideo = await metadataLoaded;
+        
+        const info = {
+          name: file.name,
+          duration: loadedVideo.duration,
+          width: loadedVideo.videoWidth,
+          height: loadedVideo.videoHeight
+        };
+        
+        setUploadedVideo(file);
+        setVideoInfo(info);
+        
+        setSegmentVideos([]);
+        setSegmentSubtitles([]);
+        setSubtitleStyles([]);
+        
+        if (selectedOption === 'single') {
+          if (info.duration > 30) {
+            await splitVideo(info);
+          } else {
+            setMessage(`Video is ${info.duration.toFixed(1)} seconds long. Processing as a single segment.`);
+            await splitVideo(info);
+          }
+        } else {
+          setMessage(`Video "${file.name}" is ready for processing.`);
+        }
+        
+        URL.revokeObjectURL(loadedVideo.src);
+      } catch (error) {
+        console.error(`Error analyzing video ${file.name}:`, error);
+        setMessage('Error analyzing video');
       }
-    ],
-    growth: [
-      {
-        title: "Predictive Publishing",
-        description: "Our algorithm analyzes platform trends and your audience behavior to determine the perfect publishing time for maximum impact.",
-        icon: <Clock className="text-violet-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-violet-900 to-purple-900"
-      },
-      {
-        title: "Cross-Platform Analytics",
-        description: "Unified performance metrics that show how your content performs across all platforms with actionable insights to improve engagement.",
-        icon: <BarChart2 className="text-cyan-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-cyan-900 to-blue-900"
-      },
-      {
-        title: "Engagement Predictor",
-        description: "Our proprietary algorithm analyzes your content before publishing to predict performance and suggest specific improvements for virality.",
-        icon: <Zap className="text-yellow-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-yellow-900 to-amber-900"
-      }
-    ],
-    collaboration: [
-      {
-        title: "Creative Cloud Integration",
-        description: "Seamlessly export projects to professional editing software with all adjustments intact for further refinement.",
-        icon: <Layers className="text-blue-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-blue-900 to-indigo-900"
-      },
-      {
-        title: "Collaborative Workflow",
-        description: "Real-time collaboration features allow teams to work together with role-based permissions and approval systems.",
-        icon: <Users className="text-emerald-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-emerald-900 to-green-900"
-      },
-      {
-        title: "Asset Management",
-        description: "Centralized library for all your videos, templates, brand assets, and previous projects with smart tagging and search.",
-        icon: <Command className="text-pink-400" size={24} />,
-        image: "/api/placeholder/500/300",
-        color: "from-pink-900 to-rose-900"
-      }
-    ]
+    }
   };
 
-  const stats = [
-    { number: "10M+", label: "active creators", icon: <Users className="text-purple-400" size={28} /> },
-    { number: "25+", label: "platforms supported", icon: <Smartphone className="text-blue-400" size={28} /> },
-    { number: "85%", label: "time saved", icon: <Clock className="text-teal-400" size={28} /> },
-    { number: "2.5B+", label: "monthly views", icon: <BarChart2 className="text-rose-400" size={28} /> }
-  ];
+  const splitVideo = async (videoInfo) => {
+    if (!ffmpeg || !uploadedVideo || !videoInfo) return;
 
-  const testimonials = [
-    {
-      quote: "VideoSync transformed my content strategy. I create once and reach my audience everywhere with perfectly optimized videos.",
-      author: "Alex Morgan",
-      role: "Tech Influencer • 3M+ Followers",
-      image: "/api/placeholder/64/64",
-      platforms: ["TikTok", "YouTube", "Instagram"]
-    },
-    {
-      quote: "Our agency used to spend days reformatting client videos. Now it's automated, and we deliver 3x the content in half the time.",
-      author: "Sarah Chen",
-      role: "Digital Marketing Director",
-      image: "/api/placeholder/64/64",
-      platforms: ["Facebook", "LinkedIn", "Twitter"]
-    },
-    {
-      quote: "The AI caption feature alone saved my team countless hours, and the engagement analytics helped us grow 400% in six months.",
-      author: "Marcus Johnson",
-      role: "Content Creator • 1.5M Subscribers",
-      image: "/api/placeholder/64/64",
-      platforms: ["YouTube", "Instagram", "TikTok"]
+    setIsProcessing(true);
+    setMessage('Processing video...');
+    setSegmentVideos([]);
+
+    try {
+      const segmentDuration = 30;
+      const maxSegments = Math.min(4, Math.ceil(videoInfo.duration / segmentDuration));
+      setMessage(`Splitting into ${maxSegments} segment(s) of up to 30 seconds each for Instagram Reels...`);
+      
+      const videoData = await fetchFile(uploadedVideo);
+      await ffmpeg.writeFile('input.mp4', videoData);
+      
+      const newSegments = [];
+      
+      for (let i = 0; i < maxSegments; i++) {
+        const startTime = i * segmentDuration;
+        const remainingDuration = Math.min(segmentDuration, videoInfo.duration - startTime);
+        if (remainingDuration <= 0) break;
+        
+        setMessage(`Creating segment ${i+1} of ${maxSegments}...`);
+        
+        await ffmpeg.exec([
+          '-i', 'input.mp4',
+          '-ss', startTime.toString(),
+          '-t', remainingDuration.toString(),
+          '-vf', 'scale=-1:1080, crop=607:1080',
+          '-c:v', 'libx264',
+          '-c:a', 'aac',
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          '-preset', 'fast',
+          '-f', 'mp4',
+          `segment_${i}.mp4`
+        ]);
+        
+        const data = await ffmpeg.readFile(`segment_${i}.mp4`);
+        const blob = new Blob([data.buffer], { type: 'video/mp4' });
+        
+        const videoEl = document.createElement('video');
+        videoEl.src = URL.createObjectURL(blob);
+        const canPlay = await new Promise(resolve => {
+          videoEl.oncanplay = () => resolve(true);
+          videoEl.onerror = () => resolve(false);
+          videoEl.load();
+        });
+        
+        if (!canPlay) {
+          throw new Error(`Segment ${i+1} is not a valid video`);
+        }
+        
+        const url = URL.createObjectURL(blob);
+        newSegments.push({
+          url,
+          startTime,
+          duration: remainingDuration,
+          index: i
+        });
+      }
+      
+      setSegmentVideos(newSegments);
+      setMessage(`Video successfully split into ${newSegments.length} Instagram Reels segments.`);
+    } catch (error) {
+      console.error('Error splitting video:', error);
+      setMessage('Error splitting video: ' + error.message);
+    } finally {
+      setIsProcessing(false);
     }
-  ];
+  };
 
-  const brands = [
-    "Netflix", "Spotify", "Adobe", "TikTok", "Red Bull", "Microsoft", "Shopify", "Electronic Arts"
-  ];
+  const generateSubtitles = async (segmentIndex) => {
+    const segment = segmentVideos[segmentIndex];
+    if (!segment) return;
 
-  const plans = [
-    {
-      name: "Creator",
-      price: "Free",
-      features: [
-        "5 videos per month",
-        "Basic AI clip creation",
-        "Standard captions",
-        "3 social platforms",
-        "Basic analytics"
-      ],
-      cta: "Start Free",
-      popular: false,
-      color: "border-blue-800 hover:border-blue-700"
-    },
-    {
-      name: "Pro",
-      price: "$29",
-      period: "/month",
-      features: [
-        "Unlimited videos",
-        "Advanced AI editing tools",
-        "Animated captions",
-        "All social platforms",
-        "Engagement predictions",
-        "Brand kit integration",
-        "Priority processing"
-      ],
-      cta: "Get Started",
-      popular: true,
-      color: "border-purple-600 hover:border-purple-500"
-    },
-    {
-      name: "Enterprise",
-      price: "Custom",
-      features: [
-        "Everything in Pro",
-        "Team collaboration",
-        "API access",
-        "Custom integrations",
-        "Dedicated support",
-        "White-label options",
-        "Advanced analytics"
-      ],
-      cta: "Contact Sales",
-      popular: false,
-      color: "border-teal-800 hover:border-teal-700"
+    setIsGeneratingSubtitles(prev => {
+      const newState = [...prev];
+      newState[segmentIndex] = true;
+      return newState;
+    });
+    setMessage(`Generating subtitles for segment ${segmentIndex + 1}...`);
+
+    try {
+      const fileName = `segment_${segment.index}_${Date.now()}.mp4`;
+      const blob = await fetch(segment.url).then(res => res.blob());
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(`input/${fileName}`, blob, {
+          contentType: 'video/mp4'
+        });
+
+      if (uploadError) {
+        console.error(`Supabase upload error for segment ${segmentIndex + 1}:`, uploadError);
+        setMessage(`Failed to upload segment ${segmentIndex + 1}: ${uploadError.message}`);
+        setSegmentSubtitles(prev => {
+          const newSubtitles = [...prev];
+          newSubtitles[segmentIndex] = [{ text: 'Upload failed', start: 0, end: segment.duration }];
+          return newSubtitles;
+        });
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(`input/${fileName}`);
+      
+      const publicUrl = urlData.publicUrl;
+
+      let transcription = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts && !transcription) {
+        try {
+          attempts++;
+          const response = await fetch('/api/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoUrl: publicUrl, segmentStart: segment.startTime })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            if (attempts === maxAttempts) {
+              setMessage(`Failed to transcribe segment ${segmentIndex + 1} after ${maxAttempts} attempts`);
+              setSegmentSubtitles(prev => {
+                const newSubtitles = [...prev];
+                newSubtitles[segmentIndex] = [{ text: 'Transcription failed', start: 0, end: segment.duration }];
+                return newSubtitles;
+              });
+              break;
+            }
+            continue;
+          }
+
+          transcription = await response.json();
+        } catch (error) {
+          if (attempts === maxAttempts) {
+            setMessage(`Error transcribing segment ${segmentIndex + 1}: ${error.message}`);
+            setSegmentSubtitles(prev => {
+              const newSubtitles = [...prev];
+              newSubtitles[segmentIndex] = [{ text: 'Error generating subtitles', start: 0, end: segment.duration }];
+              return newSubtitles;
+            });
+          }
+          continue;
+        }
+      }
+
+      if (transcription) {
+        let subtitles = [];
+        const utterances = transcription?.results?.channels?.[0]?.utterances;
+        const paragraphs = transcription?.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.paragraphs;
+
+        if (utterances && Array.isArray(utterances)) {
+          subtitles = utterances.map(utterance => ({
+            text: utterance.transcript,
+            start: utterance.start - segment.startTime,
+            end: utterance.end - segment.startTime
+          })).filter(sub => sub.start >= 0 && sub.end <= segment.duration);
+        } else if (paragraphs && Array.isArray(paragraphs)) {
+          subtitles = paragraphs.flatMap(paragraph =>
+            paragraph.sentences.map(sentence => ({
+              text: sentence.text,
+              start: sentence.start - segment.startTime,
+              end: sentence.end - segment.startTime
+            }))
+          ).filter(sub => sub.start >= 0 && sub.end <= segment.duration);
+        }
+
+        if (subtitles.length === 0) {
+          subtitles = [{ text: 'No audio detected', start: 0, end: segment.duration }];
+        }
+
+        setSegmentSubtitles(prev => {
+          const newSubtitles = [...prev];
+          newSubtitles[segmentIndex] = subtitles;
+          return newSubtitles;
+        });
+        setMessage(`Subtitles generated for segment ${segmentIndex + 1}.`);
+      }
+
+      const { error: deleteError } = await supabase.storage
+        .from('avatars')
+        .remove([`input/${fileName}`]);
+
+      if (deleteError) {
+        console.warn(`Failed to delete segment ${fileName} from Supabase:`, deleteError);
+      }
+    } catch (error) {
+      console.error(`Error processing segment ${segmentIndex + 1}:`, error);
+      setMessage(`Error processing segment ${segmentIndex + 1}: ${error.message}`);
+      setSegmentSubtitles(prev => {
+        const newSubtitles = [...prev];
+        newSubtitles[segmentIndex] = [{ text: 'Error generating subtitles', start: 0, end: segment.duration }];
+        return newSubtitles;
+      });
+    } finally {
+      setIsGeneratingSubtitles(prev => {
+        const newState = [...prev];
+        newState[segmentIndex] = false;
+        return newState;
+      });
     }
-  ];
+  };
+
+  const renderAllSegments = async () => {
+    if (!segmentVideos.length || !user) return;
+
+    setIsProcessing(true);
+    setMessage('Initiating rendering for all segments...');
+
+    try {
+      const segments = await Promise.all(segmentVideos.map(async (segment, index) => {
+        const fileName = `segment_${segment.index}_${Date.now()}.mp4`;
+        const blob = await fetch(segment.url).then(res => res.blob());
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(`input/${fileName}`, blob, {
+            contentType: 'video/mp4'
+          });
+
+        if (uploadError) {
+          throw new Error(`Failed to upload segment ${index + 1}: ${uploadError.message}`);
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(`input/${fileName}`);
+
+        return {
+          videoPath: `input/${fileName}`,
+          subtitles: segmentSubtitles[index] || [],
+          styleType: subtitleStyles[index] || 'none',
+          segmentIndex: index,
+          duration: segment.duration
+        };
+      }));
+
+      const response = await fetch('/api/bulkrender', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segments,
+          userId: user.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to initiate rendering');
+      }
+
+      const { workflowIds } = await response.json();
+      setMessage(`Rendering initiated for ${workflowIds.length} segments. Check Video Library for status.`);
+
+      // Clean up uploaded segment files
+      await supabase.storage
+        .from('avatars')
+        .remove(segments.map(s => s.videoPath));
+    } catch (error) {
+      console.error('Error initiating rendering:', error);
+      setMessage(`Error initiating rendering: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSubtitleStyleChange = (index, style) => {
+    setSubtitleStyles(prev => {
+      const newStyles = [...prev];
+      newStyles[index] = style;
+      return newStyles;
+    });
+  };
+
+  const handleAddSubtitle = (segmentIndex) => {
+    const segment = segmentVideos[segmentIndex];
+    if (!segment) return;
+
+    const start = parseFloat(newSubtitle.start);
+    const end = parseFloat(newSubtitle.end);
+
+    if (!newSubtitle.text || isNaN(start) || isNaN(end) || start < 0 || end > segment.duration || start >= end) {
+      setMessage('Please enter valid subtitle text and timing.');
+      return;
+    }
+
+    const newSub = { text: newSubtitle.text, start, end };
+    setSegmentSubtitles(prev => {
+      const newSubtitles = [...prev];
+      newSubtitles[segmentIndex] = [...(newSubtitles[segmentIndex] || []), newSub].sort((a, b) => a.start - b.start);
+      return newSubtitles;
+    });
+
+    setNewSubtitle({ text: '', start: '', end: '' });
+    setMessage(`Subtitle added to segment ${segmentIndex + 1}.`);
+  };
+
+  const handleEditSubtitle = (segmentIndex, subtitleIndex, updatedSubtitle) => {
+    const segment = segmentVideos[segmentIndex];
+    if (!segment) return;
+
+    const start = parseFloat(updatedSubtitle.start);
+    const end = parseFloat(updatedSubtitle.end);
+
+    if (!updatedSubtitle.text || isNaN(start) || isNaN(end) || start < 0 || end > segment.duration || start >= end) {
+      setMessage('Please enter valid subtitle text and timing.');
+      return;
+    }
+
+    setSegmentSubtitles(prev => {
+      const newSubtitles = [...prev];
+      newSubtitles[segmentIndex] = [
+        ...newSubtitles[segmentIndex].slice(0, subtitleIndex),
+        { text: updatedSubtitle.text, start, end },
+        ...newSubtitles[segmentIndex].slice(subtitleIndex + 1)
+      ].sort((a, b) => a.start - b.start);
+      return newSubtitles;
+    });
+
+    setMessage(`Subtitle updated in segment ${segmentIndex + 1}.`);
+  };
+
+  const handleDeleteSubtitle = (segmentIndex, subtitleIndex) => {
+    setSegmentSubtitles(prev => {
+      const newSubtitles = [...prev];
+      newSubtitles[segmentIndex] = [
+        ...newSubtitles[segmentIndex].slice(0, subtitleIndex),
+        ...newSubtitles[segmentIndex].slice(subtitleIndex + 1)
+      ];
+      return newSubtitles;
+    });
+    setMessage(`Subtitle deleted from segment ${segmentIndex + 1}.`);
+  };
+
+  const triggerVideoInput = () => {
+    videoInputRef.current?.click();
+  };
+
+  const Particles = () => {
+    return (
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {particleStyles.map((style, i) => (
+          <div 
+            key={i}
+            className="absolute w-2 h-2 rounded-full bg-purple-500 opacity-20"
+            style={style}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const NavItem = ({ icon, label, active, onClick }) => {
+    return (
+      <li>
+        <button 
+          onClick={onClick}
+          className={`w-full flex items-center py-3 px-4 rounded-xl transition-all duration-300 group
+          ${active 
+            ? 'bg-gradient-to-r from-purple-900/60 to-blue-900/40 text-white shadow-md shadow-purple-900/20' 
+            : 'text-gray-300 hover:bg-gray-800/50 hover:text-white hover:shadow-sm hover:shadow-purple-900/10'}`}
+        >
+          <div className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300
+            ${active 
+              ? 'bg-gradient-to-br from-purple-500/30 to-blue-500/30 text-purple-300' 
+              : 'text-gray-400 group-hover:text-purple-300'}`}>
+            {icon}
+          </div>
+          {sidebarOpen && (
+            <div className="ml-3 flex-1 flex flex-col items-start overflow-hidden">
+              <span className={`font-medium transition-all ${active ? 'text-white' : ''}`}>{label}</span>
+              {active && <div className="w-8 h-0.5 bg-gradient-to-r from-purple-400 to-blue-400 mt-1 rounded-full"></div>}
+            </div>
+          )}
+          {active && sidebarOpen && (
+            <div className="w-1.5 h-8 bg-gradient-to-b from-purple-400 to-blue-400 rounded-full mr-1"></div>
+          )}
+        </button>
+      </li>
+    );
+  };
 
   return (
-    <div className="bg-gray-950 text-white min-h-screen">
-      {/* Header */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-gray-950/95 backdrop-blur-md border-b border-gray-800' : 'bg-transparent'}`}>
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">VideoSync</div>
-          </div>
-          <nav className="hidden md:flex space-x-8">
-            <a href="#features" className="text-gray-400 hover:text-white transition">Features</a>
-            <a href="#testimonials" className="text-gray-400 hover:text-white transition">Testimonials</a>
-            <a href="#pricing" className="text-gray-400 hover:text-white transition">Pricing</a>
-            <a href="#faq" className="text-gray-400 hover:text-white transition">FAQ</a>
-          </nav>
-          <div className="flex space-x-4 items-center">
-            <a href="#login" className="text-gray-400 hover:text-white transition">Log in</a>
-            <a href="#signup" className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 py-2 rounded-full hover:from-purple-600 hover:to-blue-600 transition">Get Started</a>
-          </div>
+    <div className="flex h-screen bg-gray-950 text-white overflow-hidden relative">
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 opacity-50">
+        <div className="absolute top-0 left-0 w-full h-full">
+          <div className="absolute top-1/4 left-1/4 w-1/2 h-1/2 bg-purple-900/10 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '15s' }}></div>
+          <div className="absolute bottom-1/3 right-1/3 w-1/2 h-1/2 bg-blue-900/10 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '20s' }}></div>
         </div>
-      </header>
-
-      <main className="pt-20">
-        {/* Hero Section */}
-        <section className="min-h-screen py-20 relative overflow-hidden flex items-center">
-          {/* Background gradients */}
-          <div className="absolute inset-0 bg-gray-950"></div>
-          <div className="absolute top-0 left-1/4 w-1/2 h-1/2 bg-purple-900/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-1/2 h-1/2 bg-blue-900/20 rounded-full blur-3xl"></div>
-          
-          {/* Grid pattern overlay */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNjAgMEgwdjYwaDYwVjB6IiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiLz48cGF0aCBkPSJNNTkuNSAwdjYwTTAgLjV2NTlNMCAwaDYwTTAgNjBoNjAiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPg==')]"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="flex flex-col md:flex-row items-center gap-12">
-              <div className="md:w-1/2">
-                <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-900/50 border border-gray-800 text-sm font-medium mb-4 backdrop-blur-sm">
-                  <Sparkles size={16} className="mr-2 text-purple-400" />
-                  <span>Revolutionary AI Video Platform</span>
-                </div>
-                <h1 className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight">
-                  <span className="block">One video.</span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-teal-400">Infinite potential.</span>
-                </h1>
-                <p className="text-gray-300 text-xl mb-8 max-w-xl">
-                  Transform your content into platform-perfect videos for every social network. Create once, distribute everywhere with AI-powered optimization.
-                </p>
-                <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                  <a href="#signup" className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-4 rounded-full hover:from-purple-600 hover:to-blue-600 transition font-medium flex items-center justify-center">
-                    <span>Start Creating Free</span>
-                    <ArrowRight size={18} className="ml-2" />
-                  </a>
-                  <a href="#demo" className="w-full sm:w-auto flex items-center justify-center text-white px-6 py-4 rounded-full bg-gray-900/50 border border-gray-800 hover:bg-gray-800/50 transition backdrop-blur-sm">
-                    <Play size={18} className="mr-2" />
-                    <span>Watch Demo</span>
-                  </a>
-                </div>
-              </div>
-              <div className="md:w-1/2 flex justify-center">
-                <div className="relative">
-                  {/* Main video device */}
-                  <div className="relative bg-gray-900 rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
-                    <div className="w-full max-w-lg">
-                      <div className="relative w-full" style={{ paddingBottom: '177.78%' }}>
-                        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-                          <img src="/api/placeholder/500/888" alt="Video Platform Preview" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/20 transition">
-                              <Play size={24} className="text-white ml-1" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Multiple platform previews floating around */}
-                  <div className="absolute -top-6 -left-6 bg-gray-900 rounded-lg overflow-hidden shadow-xl border border-gray-800 w-36 rotate-6 animate-float">
-                    <img src="/ghibli.jpg" alt="Instagram Preview" className="w-full" />
-                  </div>
-                  <div className="absolute -bottom-4 -right-4 bg-gray-900 rounded-lg overflow-hidden shadow-xl border border-gray-800 w-40 -rotate-6 animate-float-slow">
-                    <img src="/kl.webp" alt="TikTok Preview" className="w-full" />
-                  </div>
-                  <div className="absolute top-1/4 -right-10 bg-gray-900 rounded-lg overflow-hidden shadow-xl border border-gray-800 w-32 rotate-12 animate-float-delay">
-                    <img src="/john.webp" alt="YouTube Preview" className="w-full" />
-                  </div>
-                  
-                  {/* Decorative elements */}
-                  <div className="absolute -z-10 -bottom-10 -left-10 w-40 h-40 bg-purple-500/30 rounded-full blur-3xl"></div>
-                  <div className="absolute -z-10 -top-10 -right-10 w-40 h-40 bg-blue-500/30 rounded-full blur-3xl"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Brands Section */}
-        <section className="py-12">
-          <div className="container mx-auto px-4">
-            <p className="text-center text-gray-500 mb-8">Trusted by leading creators and brands</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
-              {brands.map((brand, index) => (
-                <div key={index} className="text-gray-400 hover:text-gray-300 transition">
-                  <div className="text-lg font-medium">{brand}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Tab Features Section */}
-        <section id="features" className="py-24 relative overflow-hidden">
-          <div className="absolute top-1/4 left-0 w-1/3 h-1/3 bg-purple-900/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-1/4 right-0 w-1/3 h-1/3 bg-blue-900/20 rounded-full blur-3xl"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">Supercharge</span> your video workflow
-              </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                Create platform-perfect content in minutes, not hours. Our AI-powered tools handle the technical work so you can focus on creativity.
-              </p>
-            </div>
-            
-            {/* Feature Tabs */}
-            <div className="mb-12">
-              <div className="flex flex-wrap justify-center space-x-2 md:space-x-4">
-                {Object.keys(featuresData).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 rounded-full text-sm md:text-base transition-all duration-200 ${
-                      activeTab === tab 
-                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white font-medium' 
-                        : 'bg-gray-900 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            {/* Feature Cards */}
-            <div className="grid md:grid-cols-3 gap-6 md:gap-8">
-              {featuresData[activeTab].map((feature, index) => (
-                <div 
-                  key={index} 
-                  className="bg-gray-900/50 backdrop-blur-sm rounded-xl overflow-hidden border border-gray-800 hover:border-gray-700 transition group"
-                >
-                  <div className={`h-48 bg-gradient-to-br ${feature.color} relative overflow-hidden`}>
-                    <img src={feature.image} alt={feature.title} className="w-full h-full object-cover opacity-60 mix-blend-overlay" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 to-transparent"></div>
-                    <div className="absolute bottom-4 left-4 bg-gray-900/70 backdrop-blur-sm p-2 rounded-lg border border-gray-800">
-                      {feature.icon}
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-semibold mb-3 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-purple-400 group-hover:to-blue-400 transition-all duration-300">
-                      {feature.title}
-                    </h3>
-                    <p className="text-gray-400">{feature.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* How It Works Section */}
-        <section className="py-24 relative overflow-hidden">
-  {/* Animated background with particles */}
-  <div className="absolute inset-0">
-    <div className="absolute inset-0 bg-gradient-to-b from-gray-950 via-indigo-950/30 to-gray-950"></div>
-    <div className="hidden md:block">
-      {[...Array(20)].map((_, i) => (
-        <div 
-          key={i}
-          className="absolute rounded-full bg-blue-500/20 blur-3xl"
-          style={{
-            width: `${Math.random() * 400 + 100}px`,
-            height: `${Math.random() * 400 + 100}px`,
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            opacity: Math.random() * 0.3,
-            animationDuration: `${Math.random() * 20 + 10}s`,
-            animationDelay: `${Math.random() * 5}s`
-          }}
-        />
-      ))}
-    </div>
-  </div>
-  
-  <div className="container mx-auto px-4 relative z-10">
-    <div className="text-center mb-20">
-      <div className="inline-block mb-3">
-        <div className="flex items-center justify-center space-x-2 bg-gray-900/70 backdrop-blur-sm px-4 py-1 rounded-full border border-purple-500/30">
-          <span className="animate-pulse w-2 h-2 rounded-full bg-purple-400"></span>
-          <span className="text-purple-300 text-sm font-medium">Revolutionary Process</span>
-        </div>
-      </div>
-      <h2 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">
-        Experience the 
-        <span className="relative ml-3 inline-block">
-          <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-teal-400">VideoSync</span>
-          <span className="absolute -bottom-2 left-0 right-0 h-3 bg-gradient-to-r from-purple-500/20 via-blue-500/20 to-teal-500/20 blur-sm"></span>
-        </span> 
-        <span className="block mt-2">Magic</span>
-      </h2>
-      <p className="text-gray-400 text-xl max-w-2xl mx-auto">
-        Transform your content into platform-perfect videos with three simple steps
-      </p>
-    </div>
-    
-    {/* 3D Tilted Cards Process */}
-    <div className="relative">
-      {/* Glowing connection line */}
-      <div className="absolute hidden lg:block left-1/2 top-12 bottom-12 w-0.5 bg-gradient-to-b from-purple-500 via-blue-500 to-teal-500 -translate-x-1/2">
-        <div className="absolute top-0 left-1/2 w-12 h-24 -translate-x-1/2 bg-purple-500/30 blur-2xl"></div>
-        <div className="absolute top-1/2 left-1/2 w-12 h-24 -translate-x-1/2 -translate-y-1/2 bg-blue-500/30 blur-2xl"></div>
-        <div className="absolute bottom-0 left-1/2 w-12 h-24 -translate-x-1/2 bg-teal-500/30 blur-2xl"></div>
       </div>
       
-      {/* Process Steps */}
-      <div className="space-y-40 md:space-y-56 relative">
-        {/* Step 1 */}
-        <div className="flex flex-col lg:flex-row items-center">
-          <div className="lg:w-5/12 flex justify-end order-2 lg:order-1 mt-8 lg:mt-0">
-            <div className="group perspective">
-              <div className="relative transform transition-all duration-700 group-hover:rotate-y-12 group-hover:-rotate-x-12">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl blur opacity-40 group-hover:opacity-100 transition duration-1000"></div>
-                <div className="relative bg-gray-900 rounded-2xl p-2 shadow-2xl backdrop-blur-sm border border-gray-800">
-                  <div className="overflow-hidden rounded-xl">
-                    <img 
-                      src="/ghibli.jpg" 
-                      alt="Upload Video" 
-                      className="w-full h-auto transform transition duration-700 group-hover:scale-110" 
-                    />
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900 p-4">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
-                      <span className="text-purple-300 text-sm">Compatible with all formats</span>
-                    </div>
+      <Particles />
+
+      <div className={`${sidebarOpen ? 'w-72' : 'w-24'} bg-gray-900/90 backdrop-blur-md border-r border-gray-800/50 transition-all duration-300 flex flex-col z-10`}>
+        <div className="py-6 border-b border-gray-800/50 transition-all">
+          <div className={`px-6 flex items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
+            {sidebarOpen ? (
+              <div className="flex items-center">
+                <div className="relative w-12 h-12 mr-4 overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl shadow-lg shadow-purple-900/30 flex items-center justify-center">
+                    <Video size={24} className="text-white z-10" />
+                    <div className="absolute w-12 h-12 bg-white/20 rounded-full blur-lg animate-pulse"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-blue-500/40"></div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="lg:w-2/12 flex justify-center mb-8 lg:mb-0 order-1 lg:order-2">
-            <div className="relative">
-              <div className="absolute -inset-6 bg-purple-500/20 rounded-full blur-lg animate-pulse-slow"></div>
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center text-2xl font-bold relative z-10 shadow-lg shadow-purple-500/30">
-                1
-              </div>
-            </div>
-          </div>
-          
-          <div className="lg:w-5/12 order-3">
-            <div className="max-w-md group">
-              <h3 className="text-3xl font-bold mb-4 flex items-center">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
-                  Upload your video
-                </span>
-                <span className="ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-                  <ArrowUpCircle size={24} className="text-purple-400 animate-bounce" />
-                </span>
-              </h3>
-              <p className="text-gray-300 mb-6 text-lg leading-relaxed">
-                Drop your masterpiece onto our platform and watch the transformation begin. 
-                We handle everything from quick TikTok clips to cinematic long-form content in any format.
-              </p>
-              <div className="space-y-3">
-                <div className="flex items-center text-purple-300 bg-purple-900/20 p-3 rounded-lg border border-purple-500/20">
-                  <CheckCircle size={20} className="mr-3 text-purple-400" />
-                  <span>4K, 8K, vertical, horizontal—we support it all</span>
-                </div>
-                <div className="flex items-center text-purple-300 bg-purple-900/20 p-3 rounded-lg border border-purple-500/20">
-                  <ClockIcon size={20} className="mr-3 text-purple-400" />
-                  <span>Uploads complete in seconds, not minutes</span>
+                <div>
+                  <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">VideoSync</h1>
+                  <p className="text-xs text-gray-400">AI Video Platform</p>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="relative w-12 h-12 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl shadow-lg shadow-purple-900/30 flex items-center justify-center">
+                  <Video size={24} className="text-white z-10" />
+                  <div className="absolute w-12 h-12 bg-white/20 rounded-full blur-lg animate-pulse"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-blue-500/40"></div>
+                </div>
+              </div>
+            )}
+            <button 
+              onClick={toggleSidebar}
+              className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800/50 transition-all"
+            >
+              {sidebarOpen ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
+            </button>
           </div>
         </div>
         
-        {/* Step 2 */}
-        <div className="flex flex-col lg:flex-row items-center">
-          <div className="lg:w-5/12 order-3 lg:order-1">
-            <div className="max-w-md lg:ml-auto group">
-              <h3 className="text-3xl font-bold mb-4 flex items-center">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-400">
-                  AI transforms your content
-                </span>
-                <span className="ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-                  <Sparkles size={24} className="text-blue-400 animate-ping" style={{animationDuration: '3s'}} />
-                </span>
-              </h3>
-              <p className="text-gray-300 mb-6 text-lg leading-relaxed">
-                Our proprietary AI doesnt just clip your video—it understands it. Identifying key moments, 
-                perfect transitions, and optimal framing for each platform automatically.
+        <ScrollArea className="flex-1 py-6 px-4">
+          <div className={`mb-8 transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
+            {sidebarOpen && (
+              <div className="flex items-center justify-between px-4 mb-4">
+                <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Main Menu</h3>
+                <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
+              </div>
+            )}
+            <ul className="space-y-2">
+              <NavItem 
+                icon={<Home size={20} />} 
+                label="Dashboard" 
+                active={selectedNav === 'dashboard'}
+                onClick={() => setSelectedNav('dashboard')} 
+              />
+              <NavItem 
+                icon={<Video size={20} />} 
+                label="Video Projects" 
+                active={selectedNav === 'video-projects'} 
+                onClick={() => setSelectedNav('video-projects')}
+              />
+              <NavItem 
+                icon={<BookOpen size={20} />} 
+                label="Templates" 
+                active={selectedNav === 'templates'} 
+                onClick={() => setSelectedNav('templates')}
+              />
+              <NavItem 
+                icon={<Music size={20} />} 
+                label="Audio Library" 
+                active={selectedNav === 'audio'} 
+                onClick={() => setSelectedNav('audio')}
+              />
+            </ul>
+          </div>
+
+          <div className={`mb-8 transition-all duration-500 delay-100 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
+            {sidebarOpen && (
+              <div className="flex items-center justify-between px-4 mb-4">
+                <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Workspace</h3>
+                <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
+              </div>
+            )}
+            <ul className="space-y-2">
+              <NavItem 
+                icon={<Users size={20} />} 
+                label="Team Members" 
+                active={selectedNav === 'team'} 
+                onClick={() => setSelectedNav('team')}
+              />
+              <NavItem 
+                icon={<BarChart2 size={20} />} 
+                label="Analytics" 
+                active={selectedNav === 'analytics'} 
+                onClick={() => setSelectedNav('analytics')}
+              />
+              <NavItem 
+                icon={<Cloud size={20} />} 
+                label="Cloud Storage" 
+                active={selectedNav === 'cloud'} 
+                onClick={() => setSelectedNav('cloud')}
+              />
+              <NavItem 
+                icon={<Settings size={20} />} 
+                label="Settings" 
+                active={selectedNav === 'settings'} 
+                onClick={() => setSelectedNav('settings')}
+              />
+            </ul>
+          </div>
+
+          {sidebarOpen && (
+            <div className={`mt-8 transition-all duration-500 delay-200 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
+              <div className="relative overflow-hidden rounded-2xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40"></div>
+                <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-purple-500/20 rounded-full blur-xl"></div>
+                <div className="absolute -top-6 -left-6 w-24 h-24 bg-blue-500/20 rounded-full blur-xl"></div>
+                
+                <div className="relative p-6 backdrop-blur-sm border border-purple-500/20 rounded-2xl">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="p-3 bg-gradient-to-br from-purple-500/30 to-blue-500/30 rounded-xl border border-purple-500/20 shadow-inner shadow-purple-500/10">
+                      <Sparkles size={20} className="text-purple-300" />
+                    </div>
+                    <h4 className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">Pro Features</h4>
+                  </div>
+                  <p className="text-sm text-gray-300 mb-4 leading-relaxed">
+                    Unlock AI video enhancements, unlimited storage, and team collaboration.
+                  </p>
+                  <div className="w-full h-1.5 bg-gray-800/60 rounded-full mb-2 overflow-hidden">
+                    <div className="h-full w-3/4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-400 mb-4">
+                    <span>75% complete</span>
+                    <span>7 days left</span>
+                  </div>
+                  <button className="w-full py-3 text-sm font-medium rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 flex items-center justify-center group">
+                    <Zap size={16} className="mr-2 group-hover:animate-pulse" />
+                    Upgrade Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </ScrollArea>
+        
+        <div className="p-4 border-t border-gray-800/50">
+          <button className="w-full flex items-center justify-center py-4 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 group relative overflow-hidden">
+            <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-purple-400/0 via-white/20 to-blue-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 transform -translate-x-full group-hover:translate-x-full"></div>
+            
+            {sidebarOpen ? (
+              <>
+                <Plus size={18} className="mr-2 group-hover:rotate-90 transition-transform duration-300" />
+                <span className="font-medium">Create New Project</span>
+              </>
+            ) : (
+              <Plus size={22} className="group-hover:rotate-90 transition-transform duration-300" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col z-10">
+        <header className="bg-gray-900/70 backdrop-blur-md border-b border-gray-800/50 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-8">
+              <div className="hidden md:flex space-x-4">
+                <a href="#" className="text-gray-400 hover:text-white text-sm transition">Tutorials</a>
+                <a href="#" className="text-gray-400 hover:text-white text-sm transition">Templates</a>
+                <a href="#" className="text-gray-400 hover:text-white text-sm transition">Support</a>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button className="relative text-gray-400 hover:text-white p-2 rounded-full hover:bg-gray-800/50 transition">
+                <HelpCircle size={20} />
+                <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-purple-500"></span>
+              </button>
+              <div className="relative group">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-sm font-medium cursor-pointer border-2 border-transparent hover:border-white transition-all">
+                  {user?.firstName?.charAt(0) || 'U'}
+                </div>
+                <div className="absolute top-full right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:translate-y-0 translate-y-2">
+                  <div className="p-3 border-b border-gray-800">
+                    <div className="font-medium">{user?.fullName || 'User'}</div>
+                    <div className="text-sm text-gray-400">{user?.primaryEmailAddress?.emailAddress || 'user@example.com'}</div>
+                  </div>
+                  <div className="p-2">
+                    <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Profile Settings</a>
+                    <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Subscription</a>
+                    <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Sign Out</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-auto p-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
+                Create New Video Project
+              </h1>
+              <p className="text-gray-400 mt-2">
+                Upload and transform your videos for social media platforms automatically
               </p>
-              <div className="space-y-3">
-                <div className="flex items-center text-blue-300 bg-blue-900/20 p-3 rounded-lg border border-blue-500/20">
-                  <BrainIcon size={20} className="mr-3 text-blue-400" />
-                  <span>Smart moment detection finds viral-worthy clips</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div 
+                className={`relative border ${selectedOption === 'single' ? 'border-purple-500 bg-purple-900/10' : 'border-gray-800 hover:border-purple-400/40 hover:bg-gray-800/30'} 
+                rounded-2xl p-6 transition-all duration-300 cursor-pointer overflow-hidden group`}
+                onClick={() => setSelectedOption('single')}
+              >
+                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-purple-500/10 rounded-full blur-xl group-hover:w-60 group-hover:h-60 transition-all duration-500"></div>
+                <div className="absolute top-0 right-0 p-4">
+                  {selectedOption === 'single' && (
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white animate-fadeIn">
+                      <CheckCircle size={16} />
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center text-blue-300 bg-blue-900/20 p-3 rounded-lg border border-blue-500/20">
-                  <TextIcon size={20} className="mr-3 text-blue-400" />
-                  <span>Auto-generated captions with perfect timing</span>
+                <div className="p-3 bg-purple-500/10 rounded-xl w-14 h-14 flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-all duration-300">
+                  <Video className="text-purple-400 group-hover:text-purple-300 transition-all" size={28} />
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-white group-hover:text-purple-300 transition-colors">Single Video</h3>
+                <p className="text-gray-400 mb-4 text-sm">
+                  Upload a single video to split into Instagram Reels format with AI-powered editing
+                </p>
+                <div className="inline-flex items-center text-purple-400 text-sm font-medium">
+                  Choose <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+
+              <div 
+                className={`relative border ${selectedOption === 'bulk' ? 'border-blue-500 bg-blue-900/10' : 'border-gray-800 hover:border-blue-400/40 hover:bg-gray-800/30'} 
+                rounded-2xl p-6 transition-all duration-300 cursor-pointer overflow-hidden group`}
+                onClick={() => setSelectedOption('bulk')}
+              >
+                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-xl group-hover:w-60 group-hover:h-60 transition-all duration-500"></div>
+                <div className="absolute top-0 right-0 p-4">
+                  {selectedOption === 'bulk' && (
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white animate-fadeIn">
+                      <CheckCircle size={16} />
+                    </div>
+                  )}
+                </div>
+                <div className="p-3 bg-blue-500/10 rounded-xl w-14 h-14 flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-all duration-300">
+                  <Folder className="text-blue-400 group-hover:text-blue-300 transition-all" size={28} />
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-white group-hover:text-blue-300 transition-colors">Bulk Upload</h3>
+                <p className="text-gray-400 mb-4 text-sm">
+                  Process multiple videos at once for different social media platforms
+                </p>
+                <div className="inline-flex items-center text-blue-400 text-sm font-medium">
+                  Choose <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
             </div>
-          </div>
-          
-          <div className="lg:w-2/12 flex justify-center mb-8 lg:mb-0 order-1 lg:order-2">
-            <div className="relative">
-              <div className="absolute -inset-6 bg-blue-500/20 rounded-full blur-lg animate-pulse-slow"></div>
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-teal-600 rounded-full flex items-center justify-center text-2xl font-bold relative z-10 shadow-lg shadow-blue-500/30">
-                2
-              </div>
-            </div>
-          </div>
-          
-          <div className="lg:w-5/12 flex justify-start order-2 lg:order-3 mt-8 lg:mt-0">
-            <div className="group perspective">
-              <div className="relative transform transition-all duration-700 group-hover:rotate-y-12 group-hover:rotate-x-12">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-teal-600 rounded-2xl blur opacity-40 group-hover:opacity-100 transition duration-1000"></div>
-                <div className="relative bg-gray-900 rounded-2xl p-2 shadow-2xl backdrop-blur-sm border border-gray-800">
-                  <div className="overflow-hidden rounded-xl relative">
-                    <img 
-                      src="/kl.webp" 
-                      alt="AI Processing" 
-                      className="w-full h-auto transform transition duration-700 group-hover:scale-110" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-teal-600/30 mix-blend-overlay"></div>
+
+            {selectedOption === 'single' && (
+              <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 mb-8 transition-all animate-fadeIn relative overflow-hidden">
+                <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-900/30 rounded-full filter blur-3xl animate-pulse"></div>
+                <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-900/30 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+                <div className="absolute top-1/3 right-1/3 w-64 h-64 bg-purple-700/20 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+                <div className="absolute bottom-1/3 left-1/3 w-48 h-48 bg-blue-700/20 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '3s' }}></div>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-r from-purple-900/10 to-blue-900/10 rounded-full filter blur-3xl"></div>
+
+                <div className="text-center mb-6 relative z-10">
+                  <h2 className="text-2xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300">Upload Your Reel</h2>
+                  <p className="text-gray-400">Drag and drop your video to create an Instagram Reel with AI enhancements.</p>
+                </div>
+
+                <motion.div 
+                  className={`border-2 border-dashed rounded-xl py-16 px-8 text-center transition-all relative z-10 ${dragActive ? 'border-purple-500 bg-purple-900/20 shadow-xl shadow-purple-900/40' : 'border-gray-700'}`}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <input 
+                    type="file" 
+                    accept="video/*" 
+                    onChange={handleVideoUpload} 
+                    className="hidden" 
+                    ref={videoInputRef}
+                  />
+                  
+                  {!uploadedVideo && (
+                    <div>
+                      <motion.div 
+                        animate={pulseAnimation}
+                        className="mx-auto w-32 h-32 bg-gradient-to-br from-purple-900/40 to-blue-900/40 rounded-full flex items-center justify-center mb-8 relative group"
+                      >
+                        <div className="absolute inset-0 rounded-full border-2 border-dashed border-purple-500/50 animate-spin-slow"></div>
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500/30 to-blue-500/30 opacity-0 group-hover:opacity-100 scale-110 transition-all duration-300"></div>
+                        <Upload size={40} className="text-purple-400 group-hover:scale-110 transition-all duration-300" />
+                      </motion.div>
+                      <h4 className="text-2xl font-medium mb-3 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300">Drag your reel here</h4>
+                      <p className="text-gray-400 mb-10 max-w-lg mx-auto leading-relaxed">
+                        Upload your video for Instagram Reels. We support vertical format videos (9:16) and other aspect ratios. Your reel will be processed with AI enhancements in minutes.
+                      </p>
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={triggerVideoInput}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium py-4 px-10 rounded-lg transition-all shadow-xl shadow-purple-900/30 hover:shadow-purple-900/50 relative overflow-hidden group"
+                      >
+                        <span className="relative z-10 flex items-center justify-center text-lg">
+                          <Zap size={22} className="mr-2" />
+                          Select Reel
+                        </span>
+                        <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-purple-500/0 via-white/20 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 transform -translate-x-full group-hover:translate-x-full"></div>
+                      </motion.button>
+                      <p className="text-xs text-gray-500 mt-6">
+                        By uploading, you agree to our Terms of Service
+                      </p>
+                    </div>
+                  )}
+                  
+                  {uploadedVideo && videoInfo && (
+                    <div>
+                      <div className="mx-auto w-16 h-16 bg-green-900/20 rounded-full flex items-center justify-center mb-4">
+                        <CheckCircle size={28} className="text-green-400" />
+                      </div>
+                      <p className="text-gray-300 mb-2">Video uploaded successfully</p>
+                      <h3 className="text-lg font-medium mb-2">{videoInfo.name}</h3>
+                      <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-400 mb-4">
+                        <span>Duration: {videoInfo.duration.toFixed(1)}s</span>
+                        <span>Resolution: {videoInfo.width}x{videoInfo.height}</span>
+                      </div>
+                      
+                      {!isProcessing && segmentVideos.length === 0 && (
+                        <button 
+                          onClick={() => splitVideo(videoInfo)}
+                          className="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-medium transition-all shadow-lg shadow-purple-900/30 hover:shadow-purple-900/50 flex items-center justify-center mx-auto"
+                          disabled={isProcessing}
+                        >
+                          <Scissors size={18} className="mr-2" />
+                          Split into Instagram Reels
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+
+                {isProcessing && (
+                  <div className="mt-6 animate-fadeIn">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-400">Processing video...</span>
+                      <span className="text-sm text-gray-400">{Math.round(progress)}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">{message}</p>
+                  </div>
+                )}
+
+                {segmentVideos.length > 0 && (
+                  <div className="mt-8 animate-fadeIn">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-semibold">Instagram Reels Segments</h3>
+                      <button
+                        onClick={renderAllSegments}
+                        className="py-3 px-6 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-lg text-white font-medium transition-all shadow-md shadow-purple-900/20 hover:shadow-purple-900/40 flex items-center"
+                        disabled={isProcessing || isGeneratingSubtitles.some(s => s)}
+                      >
+                        <Sparkles size={18} className="mr-2" />
+                        Render All Segments
+                      </button>
+                    </div>
+                    <p className="text-gray-400 mb-6">Your video has been split into {segmentVideos.length} Instagram Reels format clips. Generate or manually add subtitles and choose a style for each segment.</p>
                     
-                    {/* Animated overlay elements */}
-                    <div className="absolute inset-0">
-                      {/* Simulated AI analysis markers */}
-                      {[...Array(5)].map((_, i) => (
-                        <div 
-                          key={i}
-                          className="absolute w-12 h-12 border-2 border-blue-400/70 rounded"
-                          style={{
-                            left: `${Math.random() * 70 + 10}%`,
-                            top: `${Math.random() * 70 + 10}%`,
-                            transform: 'translate(-50%, -50%)',
-                            opacity: 0,
-                            animation: `fadeInOut 3s ${i * 0.5}s infinite`
-                          }}
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {segmentVideos.map((segment, index) => (
+                        <div key={index} className="border border-gray-800 rounded-xl overflow-hidden bg-gray-900/50 group">
+                          <div className="aspect-[9/16] relative overflow-hidden bg-black">
+                            <Player
+                              key={index}
+                              component={VideoWithSubtitle}
+                              inputProps={{
+                                videoUrl: segment.url,
+                                subtitles: segmentSubtitles[index] || [],
+                                styleType: subtitleStyles[index] || 'none'
+                              }}
+                              durationInFrames={Math.ceil(segment.duration * 30)}
+                              compositionWidth={607}
+                              compositionHeight={1080}
+                              fps={30}
+                              controls
+                              autoPlay
+                              loop
+                              style={{
+                                width: '100%',
+                                height: '100%'
+                              }}
+                            />
+                          </div>
+                          
+                          <div className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-medium">Segment {index + 1}</h4>
+                              <span className="text-sm text-gray-400">
+                                {Math.floor(segment.startTime / 60)}:{(segment.startTime % 60).toString().padStart(2, '0')} - 
+                                {Math.floor((segment.startTime + segment.duration) / 60)}:{((segment.startTime + segment.duration) % 60).toString().padStart(2, '0')}
+                              </span>
+                            </div>
+                            
+                            <div className="mb-4">
+                              <label className="text-sm text-gray-400 block mb-1">Subtitle Style</label>
+                              <select
+                                value={subtitleStyles[index] || 'none'}
+                                onChange={(e) => handleSubtitleStyleChange(index, e.target.value)}
+                                className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-gray-300"
+                              >
+                                <option value="none">Default</option>
+                                <option value="hormozi">Alex Hormozi</option>
+                                <option value="abdaal">Ali Abdaal</option>
+                                <option value="neonGlow">Neon Glow</option>
+                                <option value="retroWave">Retro Wave</option>
+                                <option value="minimalPop">Minimal Pop</option>
+                              </select>
+                            </div>
+
+                            <div className="mb-4">
+                              <button
+                                onClick={() => setEditingSegmentIndex(editingSegmentIndex === index ? null : index)}
+                                className="w-full py-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-white font-medium transition-all flex items-center justify-center"
+                              >
+                                {editingSegmentIndex === index ? 'Close Subtitle Editor' : 'Edit Subtitles'}
+                              </button>
+                            </div>
+
+                            {editingSegmentIndex === index && (
+                              <div className="mb-4 p-4 bg-gray-800 rounded-lg">
+                                <h5 className="text-sm font-medium mb-2">Add New Subtitle</h5>
+                                <div className="grid grid-cols-3 gap-2 mb-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Subtitle text"
+                                    value={newSubtitle.text}
+                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, text: e.target.value })}
+                                    className="col-span-3 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                  />
+                                  <input
+                                    type="number"
+                                    placeholder="Start (s)"
+                                    value={newSubtitle.start}
+                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, start: e.target.value })}
+                                    className="bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                    step="0.1"
+                                    min="0"
+                                    max={segment.duration}
+                                  />
+                                  <input
+                                    type="number"
+                                    placeholder="End (s)"
+                                    value={newSubtitle.end}
+                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, end: e.target.value })}
+                                    className="bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                    step="0.1"
+                                    min="0"
+                                    max={segment.duration}
+                                  />
+                                  <button
+                                    onClick={() => handleAddSubtitle(index)}
+                                    className="bg-purple-600 hover:bg-purple-500 rounded-lg p-2 text-sm text-white"
+                                  >
+                                    Add
+                                  </button>
+                                </div>
+
+                                <div className="mb-2">
+                                  <h5 className="text-sm font-medium mb-1">Timeline</h5>
+                                  <div className="relative h-8 bg-gray-700 rounded-lg">
+                                    {segmentSubtitles[index]?.map((sub, i) => (
+                                      <div
+                                        key={i}
+                                        className="absolute h-8 bg-purple-500 rounded-lg"
+                                        style={{
+                                          left: `${(sub.start / segment.duration) * 100}%`,
+                                          width: `${((sub.end - sub.start) / segment.duration) * 100}%`
+                                        }}
+                                        title={`${sub.text} (${sub.start.toFixed(1)}s - ${sub.end.toFixed(1)}s)`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="max-h-40 overflow-auto">
+                                  <h5 className="text-sm font-medium mb-1">Existing Subtitles</h5>
+                                  {segmentSubtitles[index]?.length > 0 ? (
+                                    segmentSubtitles[index].map((sub, i) => (
+                                      <div key={i} className="flex items-center gap-2 mb-2">
+                                        <input
+                                          type="text"
+                                          value={sub.text}
+                                          onChange={(e) => handleEditSubtitle(index, i, { ...sub, text: e.target.value })}
+                                          className="flex-1 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                        />
+                                        <input
+                                          type="number"
+                                          value={sub.start}
+                                          onChange={(e) => handleEditSubtitle(index, i, { ...sub, start: e.target.value })}
+                                          className="w-20 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                          step="0.1"
+                                          min="0"
+                                          max={segment.duration}
+                                        />
+                                        <input
+                                          type="number"
+                                          value={sub.end}
+                                          onChange={(e) => handleEditSubtitle(index, i, { ...sub, end: e.target.value })}
+                                          className="w-20 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                          step="0.1"
+                                          min="0"
+                                          max={segment.duration}
+                                        />
+                                        <button
+                                          onClick={() => handleDeleteSubtitle(index, i)}
+                                          className="bg-red-600 hover:bg-red-500 rounded-lg p-2 text-sm text-white"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-gray-500">No subtitles added</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            <button
+                              onClick={() => generateSubtitles(index)}
+                              className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg text-white font-medium transition-all shadow-md shadow-blue-900/20 hover:shadow-blue-900/40 flex items-center justify-center mb-2"
+                              disabled={isGeneratingSubtitles[index] || isProcessing}
+                            >
+                              <Sparkles size={18} className="mr-2" />
+                              {isGeneratingSubtitles[index] ? 'Generating Subtitles...' : 'Generate Subtitles'}
+                            </button>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900 p-4">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
-                      <span className="text-blue-300 text-sm">Advanced AI processing</span>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Step 3 */}
-        <div className="flex flex-col lg:flex-row items-center">
-          <div className="lg:w-5/12 flex justify-end order-2 lg:order-1 mt-8 lg:mt-0">
-            <div className="group perspective">
-              <div className="relative transform transition-all duration-700 group-hover:-rotate-y-12 group-hover:-rotate-x-12">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-teal-600 to-emerald-600 rounded-2xl blur opacity-40 group-hover:opacity-100 transition duration-1000"></div>
-                <div className="relative bg-gray-900 rounded-2xl p-2 shadow-2xl backdrop-blur-sm border border-gray-800">
-                  <div className="overflow-hidden rounded-xl relative">
-                    <img 
-                      src="/john.webp" 
-                      alt="Publish Everywhere" 
-                      className="w-full h-auto transform transition duration-700 group-hover:scale-110" 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-teal-600/30 to-emerald-600/30 mix-blend-overlay"></div>
-                    
-                    {/* Platform icons */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="grid grid-cols-3 gap-6">
-                        {['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'linkedin'].map((platform, i) => (
+            )}
+            
+            {selectedOption === 'bulk' && (
+              <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 mb-8 transition-all animate-fadeIn">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-semibold mb-2">Bulk Upload</h2>
+                  <p className="text-gray-400">Process multiple videos for different social media platforms at once</p>
+                </div>
+                
+                {!bulkUploadComplete ? (
+                  <BulkUpload onComplete={() => setBulkUploadComplete(true)} />
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle size={28} className="text-green-400" />
+                    </div>
+                    <h3 className="text-xl font-medium mb-2">Bulk Processing Complete!</h3>
+                    <p className="text-gray-400 mb-6">Your videos have been processed and are ready for download</p>
+                    <button className="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition-all shadow-lg shadow-blue-900/30 hover:shadow-blue-900/50">
+                      View All Processed Videos
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 transition-all animate-fadeIn">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold">Recent Projects</h2>
+                <button className="text-sm text-purple-400 hover:text-purple-300 flex items-center">
+                  View All <ChevronRight size={16} className="ml-1" />
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {recentProjects.map((project, index) => (
+                  <div key={index} className="border border-gray-800 rounded-xl overflow-hidden bg-gray-900/50 hover:border-gray-700 transition-all group">
+                    <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 relative">
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Play size={36} className="text-gray-600 group-hover:text-purple-400 transition-colors" />
+                      </div>
+                      {project.progress < 100 && (
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
                           <div 
-                            key={platform}
-                            className="w-12 h-12 bg-gray-900/80 rounded-full flex items-center justify-center"
-                            style={{
-                              animation: `float 3s ${i * 0.2}s infinite ease-in-out`
-                            }}
-                          >
-                            <span className="text-teal-300 text-xl">{platform[0].toUpperCase()}</span>
-                          </div>
-                        ))}
+                            className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
+                            style={{ width: `${project.progress}%` }}
+                          ></div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <h4 className="font-medium">{project.name}</h4>
+                        {project.progress === 100 ? (
+                          <span className="text-xs px-2 py-1 rounded-full bg-green-900/20 text-green-400">Completed</span>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded-full bg-purple-900/20 text-purple-400">In Progress</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-gray-400">
+                        <span className="flex items-center"><Clock size={14} className="mr-1" /> {project.date}</span>
+                        <span>Instagram Reels</span>
                       </div>
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900 p-4">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
-                      <span className="text-teal-300 text-sm">Multi-platform publishing</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="lg:w-2/12 flex justify-center mb-8 lg:mb-0 order-1 lg:order-2">
-            <div className="relative">
-              <div className="absolute -inset-6 bg-teal-500/20 rounded-full blur-lg animate-pulse-slow"></div>
-              <div className="w-16 h-16 bg-gradient-to-r from-teal-600 to-emerald-600 rounded-full flex items-center justify-center text-2xl font-bold relative z-10 shadow-lg shadow-teal-500/30">
-                3
-              </div>
-            </div>
-          </div>
-          
-          <div className="lg:w-5/12 order-3">
-            <div className="max-w-md group">
-              <h3 className="text-3xl font-bold mb-4 flex items-center">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">
-                  Publish everywhere
-                </span>
-                <span className="ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-                  <Rocket size={24} className="text-teal-400 animate-float" />
-                </span>
-              </h3>
-              <p className="text-gray-300 mb-6 text-lg leading-relaxed">
-                One-click publishing to all major platforms. Our intelligent scheduling ensures your content 
-                drops at peak engagement times, maximizing your reach and impact.
-              </p>
-              <div className="space-y-3">
-                <div className="flex items-center text-teal-300 bg-teal-900/20 p-3 rounded-lg border border-teal-500/20">
-                  <CalendarIcon size={20} className="mr-3 text-teal-400" />
-                  <span>AI-powered optimal posting schedule</span>
-                </div>
-                <div className="flex items-center text-teal-300 bg-teal-900/20 p-3 rounded-lg border border-teal-500/20">
-                  <BarChart2 size={20} className="mr-3 text-teal-400" />
-                  <span>Comprehensive analytics across platforms</span>
-                </div>
-              </div>
-              <div className="mt-8">
-                <button className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white font-medium py-3 px-6 rounded-lg shadow-lg shadow-teal-500/30 transform transition hover:-translate-y-1 duration-300 flex items-center">
-                  <span>Start publishing today</span>
-                  <ArrowRight size={18} className="ml-2" />
-                </button>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-    
-    {/* Add CSS for animations */}
-    <style jsx>{`
-      @keyframes float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
-      }
-      
-      @keyframes pulse-slow {
-        0%, 100% { opacity: 0.3; }
-        50% { opacity: 0.6; }
-      }
-      
-      @keyframes fadeInOut {
-        0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-        50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
-        100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
-      }
-      
-      .perspective {
-        perspective: 1000px;
-      }
-      
-      .rotate-y-12 {
-        transform: rotateY(12deg);
-      }
-      
-      .rotate-x-12 {
-        transform: rotateX(12deg);
-      }
-      
-      .-rotate-y-12 {
-        transform: rotateY(-12deg);
-      }
-      
-      .-rotate-x-12 {
-        transform: rotateX(-12deg);
-      }
-      
-      .animate-float {
-        animation: float 3s infinite ease-in-out;
-      }
-      
-      .animate-pulse-slow {
-        animation: pulse-slow 4s infinite ease-in-out;
-      }
-    `}</style>
-  </div>
-</section>
-
-        {/* Stats Section */}
-        <section id="stats-section" className="py-16 relative overflow-hidden">
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {stats.map((stat, index) => (
-                <div 
-                  key={index} 
-                  className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-800 p-6 text-center transform hover:scale-105 transition duration-300"
-                >
-                  <div className="flex justify-center mb-4">
-                    {stat.icon}
-                  </div>
-                  <div className={`text-3xl md:text-4xl font-bold mb-2 ${animateStats ? 'animate-count-up' : ''}`}>
-                    {stat.number}
-                  </div>
-                  <div className="text-gray-400">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Platform Support Section */}
-        <section className="py-24 relative overflow-hidden">
-          <div className="absolute top-1/3 right-0 w-1/3 h-1/3 bg-purple-900/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-1/3 left-0 w-1/3 h-1/3 bg-blue-900/20 rounded-full blur-3xl"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                One video, <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">every platform</span>
-              </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                Automatically transform your content into the perfect format for each platform
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-              <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-800 p-6 flex flex-col items-center hover:border-purple-500 transition">
-                <TikTok size={36} className="text-purple-400 mb-3" />
-                <h3 className="font-medium text-lg">TikTok</h3>
-                <p className="text-gray-500 text-sm text-center mt-2">9:16 vertical format with trending elements</p>
-              </div>
-              
-              <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-800 p-6 flex flex-col items-center hover:border-blue-500 transition">
-                <Youtube size={36} className="text-blue-400 mb-3" />
-                <h3 className="font-medium text-lg">YouTube</h3>
-                <p className="text-gray-500 text-sm text-center mt-2">16:9 widescreen with chapters & cards</p>
-              </div>
-              
-              <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-800 p-6 flex flex-col items-center hover:border-pink-500 transition">
-                <Instagram size={36} className="text-pink-400 mb-3" />
-                <h3 className="font-medium text-lg">Instagram</h3>
-                <p className="text-gray-500 text-sm text-center mt-2">Reels, carousel posts & stories</p>
-              </div>
-              
-              <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-800 p-6 flex flex-col items-center hover:border-cyan-500 transition">
-                <Twitter size={36} className="text-cyan-400 mb-3" />
-                <h3 className="font-medium text-lg">Twitter</h3>
-                <p className="text-gray-500 text-sm text-center mt-2">Captivating videos with text overlays</p>
-              </div>
-              
-              <div className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-800 p-6 flex flex-col items-center hover:border-teal-500 transition">
-                <Facebook size={36} className="text-teal-400 mb-3" />
-                <h3 className="font-medium text-lg">Facebook</h3>
-                <p className="text-gray-500 text-sm text-center mt-2">Feed videos & stories optimized for engagement</p>
-              </div>
-            </div>
-            
-            <div className="mt-12 text-center">
-              <p className="text-gray-400 mb-6">And many more platforms supported...</p>
-              <a href="#all-platforms" className="inline-flex items-center text-purple-400 hover:text-purple-300 transition">
-                <span>See all supported platforms</span>
-                <ArrowRight size={16} className="ml-2" />
-              </a>
-            </div>
-          </div>
-        </section>
-
-        {/* Testimonials Section */}
-        <section id="testimonials" className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"></div>
-          <div className="absolute top-1/2 left-1/4 w-1/2 h-1/2 bg-purple-900/20 rounded-full blur-3xl"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                Loved by <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">creators worldwide</span>
-              </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                Join thousands of content creators who are saving time and growing their audience
-              </p>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-8">
-              {testimonials.map((testimonial, index) => (
-                <div key={index} className="bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-800 p-8 hover:border-purple-500 transition">
-                  <div className="flex items-start mb-6">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} size={20} className="text-yellow-400 mr-1" />
-                    ))}
-                  </div>
-                  <blockquote className="text-lg mb-6">{testimonial.quote}</blockquote>
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 rounded-full overflow-hidden mr-4 border border-gray-700">
-                      <img src={testimonial.image} alt={testimonial.author} className="w-full h-full object-cover" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium">{testimonial.author}</h4>
-                      <p className="text-gray-400 text-sm">{testimonial.role}</p>
-                      <div className="flex mt-2 space-x-2">
-                        {testimonial.platforms.map((platform, i) => (
-                          <span key={i} className="text-xs px-2 py-1 bg-gray-800 rounded-full text-gray-300">
-                            {platform}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Pricing Section */}
-        <section id="pricing" className="py-24 relative overflow-hidden">
-          <div className="absolute top-1/3 left-0 w-1/3 h-1/3 bg-purple-900/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-1/3 right-0 w-1/3 h-1/3 bg-blue-900/20 rounded-full blur-3xl"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">Simple pricing</span>, powerful results
-              </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                Choose the plan that fits your needs. No hidden fees or complicated tiers.
-              </p>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              {plans.map((plan, index) => (
-                <div key={index} className={`bg-gray-900/50 backdrop-blur-sm rounded-xl border-2 ${plan.color} p-8 transform ${plan.popular ? 'scale-105 relative z-10' : ''} transition duration-300 hover:translate-y-[-8px]`}>
-                  {plan.popular && (
-                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm font-medium px-4 py-1 rounded-full">
-                      Most Popular
-                    </div>
-                  )}
-                  <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold">{plan.price}</span>
-                    {plan.period && <span className="text-gray-400">{plan.period}</span>}
-                  </div>
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start">
-                        <CheckCircle size={18} className="text-green-400 mr-2 mt-0.5 flex-shrink-0" />
-                        <span className="text-gray-300">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a 
-                    href="#signup" 
-                    className={`block w-full py-3 rounded-lg text-center font-medium transition 
-                    ${plan.popular 
-                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600' 
-                      : 'bg-gray-800 text-white hover:bg-gray-700'}`}
-                  >
-                    {plan.cta}
-                  </a>
-                </div>
-              ))}
-            </div>
-            
-            <div className="mt-12 text-center">
-              <p className="text-gray-400">
-                Need a custom solution for your enterprise? <a href="#contact" className="text-purple-400 hover:text-purple-300">Contact our sales team</a>
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* FAQ Section */}
-        <section id="faq" className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold mb-4">
-                Frequently asked <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">questions</span>
-              </h2>
-              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                Everything you need to know about VideoSync and how it works
-              </p>
-            </div>
-            
-            <div className="max-w-3xl mx-auto">
-              {faqs.map((faq, index) => (
-                <div 
-                  key={index} 
-                  className="mb-6 bg-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-800 overflow-hidden transition"
-                >
-                  <button 
-                    onClick={() => toggleFaq(index)} 
-                    className="w-full flex justify-between items-center p-6 text-left font-medium text-lg focus:outline-none"
-                  >
-                    {faq.question}
-                    <ChevronDown 
-                      size={20} 
-                      className={`transform transition-transform ${openFaq === index ? 'rotate-180' : ''}`} 
-                    />
-                  </button>
-                  <div 
-                    className={`px-6 transition-all duration-300 ease-in-out overflow-hidden ${
-                      openFaq === index ? 'max-h-96 pb-6' : 'max-h-0'
-                    }`}
-                  >
-                    <p className="text-gray-400">{faq.answer}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="mt-12 text-center">
-              <p className="text-gray-400 mb-6">
-                Still have questions? Were here to help!
-              </p>
-              <a href="#contact" className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-full hover:from-purple-600 hover:to-blue-600 transition">
-                <MessageCircle size={18} className="mr-2" />
-                <span>Contact Support</span>
-              </a>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-900/30 to-blue-900/30"></div>
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNjAgMEgwdjYwaDYwVjB6IiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiLz48cGF0aCBkPSJNNTkuNSAwdjYwTTAgLjV2NTlNMCAwaDYwTTAgNjBoNjAiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPg==')]"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="max-w-4xl mx-auto bg-gray-900/70 backdrop-blur-lg rounded-2xl border border-gray-800 p-8 md:p-12">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                  Ready to transform your <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">content strategy?</span>
-                </h2>
-                <p className="text-gray-300 text-lg">
-                  Join thousands of creators saving time and growing their audience across every platform.
-                </p>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                <a href="#signup" className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-xl hover:from-purple-600 hover:to-blue-600 transition font-medium">
-                  <span>Start Creating Free</span>
-                  <ArrowRight size={18} className="ml-2" />
-                </a>
-                <a href="#demo" className="inline-flex items-center justify-center px-8 py-4 bg-gray-800 text-white rounded-xl hover:bg-gray-700 transition">
-                  <Play size={18} className="mr-2" />
-                  <span>Watch Demo</span>
-                </a>
-              </div>
-              
-              <div className="mt-8 text-center text-gray-400 text-sm">
-                No credit card required. Free plan includes 5 videos per month.
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 border-t border-gray-800">
-        <div className="container mx-auto px-4 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-            <div className="md:col-span-2">
-              <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 mb-4">VideoSync</div>
-              <p className="text-gray-400 mb-4 max-w-md">
-                Transform your content creation process with AI-powered video optimization for every social platform.
-              </p>
-              <div className="flex space-x-4">
-                <a href="#twitter" className="text-gray-400 hover:text-white transition">
-                  <Twitter size={20} />
-                </a>
-                <a href="#instagram" className="text-gray-400 hover:text-white transition">
-                  <Instagram size={20} />
-                </a>
-                <a href="#youtube" className="text-gray-400 hover:text-white transition">
-                  <Youtube size={20} />
-                </a>
-                <a href="#tiktok" className="text-gray-400 hover:text-white transition">
-                  <TikTok size={20} />
-                </a>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="font-medium mb-4">Product</h3>
-              <ul className="space-y-2">
-                <li><a href="#features" className="text-gray-400 hover:text-white transition">Features</a></li>
-                <li><a href="#pricing" className="text-gray-400 hover:text-white transition">Pricing</a></li>
-                <li><a href="#integrations" className="text-gray-400 hover:text-white transition">Integrations</a></li>
-                <li><a href="#enterprise" className="text-gray-400 hover:text-white transition">Enterprise</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-medium mb-4">Resources</h3>
-              <ul className="space-y-2">
-                <li><a href="#blog" className="text-gray-400 hover:text-white transition">Blog</a></li>
-                <li><a href="#guides" className="text-gray-400 hover:text-white transition">Guides</a></li>
-                <li><a href="#help" className="text-gray-400 hover:text-white transition">Help Center</a></li>
-                <li><a href="#events" className="text-gray-400 hover:text-white transition">Events</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-medium mb-4">Company</h3>
-              <ul className="space-y-2">
-                <li><a href="#about" className="text-gray-400 hover:text-white transition">About</a></li>
-                <li><a href="#careers" className="text-gray-400 hover:text-white transition">Careers</a></li>
-                <li><a href="#contact" className="text-gray-400 hover:text-white transition">Contact</a></li>
-                <li><a href="#press" className="text-gray-400 hover:text-white transition">Press</a></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
-            <div className="text-gray-500 text-sm mb-4 md:mb-0">
-              © {new Date().getFullYear()} VideoSync. All rights reserved.
-            </div>
-            <div className="flex space-x-4 text-sm">
-              <a href="#terms" className="text-gray-500 hover:text-white transition">Terms</a>
-              <a href="#privacy" className="text-gray-500 hover:text-white transition">Privacy</a>
-              <a href="#cookies" className="text-gray-500 hover:text-white transition">Cookies</a>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

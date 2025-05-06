@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   Upload, Video, Scissors, Folder, CheckCircle, ChevronDown, ChevronRight, Home, Settings, Users, 
-  BarChart2, HelpCircle, Plus, ArrowRight, Sparkles, Clock, Zap, BookOpen, Music, Cloud, Download,Play
+  BarChart2, HelpCircle, Plus, ArrowRight, Sparkles, Clock, Zap, BookOpen, Music, Cloud, Download, Play
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
@@ -11,7 +11,7 @@ import BulkUpload from '@/components/bulkupload';
 import { Player } from '@remotion/player';
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video as RemotionVideo } from 'remotion';
 import { createClient } from '@supabase/supabase-js';
-
+import { motion } from 'framer-motion';
 // Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -67,7 +67,7 @@ const SubtitleOverlay = ({ subtitles, styleType }) => {
       backgroundColor: 'rgba(0, 0, 0, 0.6)',
       borderRadius: '10px',
       border: '2px solid #FFFFFF',
-      zIndex: '10',
+      zIndex: 10,
       opacity: activeSubtitle ? 1 : 0,
       transition: 'opacity 0.2s ease-in-out'
     },
@@ -101,6 +101,8 @@ const SubtitleOverlay = ({ subtitles, styleType }) => {
       fontSize: '30px',
       fontWeight: '400',
       color: '#FF69B4',
+
+
       textShadow: '0 0 10px #FF1493, 0 0 20px #9400D3',
       padding: '10px 15px',
       background: 'rgba(0, 0, 0, 0.7)',
@@ -165,7 +167,6 @@ const VideoWithSubtitle = ({ videoUrl, subtitles, styleType }) => {
       <RemotionVideo
         src={videoUrl}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        muted
         startFrom={0}
         endAt={durationInFrames}
         onError={(e) => console.error('Main video load error:', e)}
@@ -173,6 +174,16 @@ const VideoWithSubtitle = ({ videoUrl, subtitles, styleType }) => {
       <SubtitleOverlay subtitles={subtitles} styleType={styleType} />
     </AbsoluteFill>
   );
+};
+
+// Animation variants for the upload section
+const pulseAnimation = {
+  scale: [1, 1.03, 1],
+  transition: {
+    duration: 2,
+    repeat: Infinity,
+    repeatType: "reverse",
+  }
 };
 
 export default function VideoUploadPage() {
@@ -195,6 +206,8 @@ export default function VideoUploadPage() {
   const [subtitleStyles, setSubtitleStyles] = useState([]);
   const [particleStyles, setParticleStyles] = useState([]);
   const [isGeneratingSubtitles, setIsGeneratingSubtitles] = useState([]);
+  const [editingSegmentIndex, setEditingSegmentIndex] = useState(null);
+  const [newSubtitle, setNewSubtitle] = useState({ text: '', start: '', end: '' });
 
   // Mock recent projects data
   const recentProjects = [
@@ -247,10 +260,14 @@ export default function VideoUploadPage() {
       setSegmentSubtitles(segmentVideos.map(() => []));
       setSubtitleStyles(segmentVideos.map(() => 'none'));
       setIsGeneratingSubtitles(segmentVideos.map(() => false));
+    } else {
+      setSegmentSubtitles([]);
+      setSubtitleStyles([]);
+      setIsGeneratingSubtitles([]);
     }
   }, [segmentVideos]);
 
-  // Generate particle styles on client side only
+  // Generate particle styles
   useEffect(() => {
     const styles = [...Array(20)].map(() => ({
       top: `${Math.random() * 100}%`,
@@ -382,7 +399,6 @@ export default function VideoUploadPage() {
         
         const data = await ffmpeg.readFile(`segment_${i}.mp4`);
         const blob = new Blob([data.buffer], { type: 'video/mp4' });
-        console.log(`Segment ${i+1} size: ${blob.size} bytes`);
         
         const videoEl = document.createElement('video');
         videoEl.src = URL.createObjectURL(blob);
@@ -430,7 +446,6 @@ export default function VideoUploadPage() {
       const fileName = `segment_${segment.index}_${Date.now()}.mp4`;
       const blob = await fetch(segment.url).then(res => res.blob());
       
-      // Upload to Supabase
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(`input/${fileName}`, blob, {
@@ -448,17 +463,12 @@ export default function VideoUploadPage() {
         return;
       }
 
-      console.log(`Uploaded segment ${segmentIndex + 1}:`, uploadData);
-
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(`input/${fileName}`);
       
       const publicUrl = urlData.publicUrl;
-      console.log(`Public URL for segment ${segmentIndex + 1}:`, publicUrl);
 
-      // Retry transcription up to 3 times
       let transcription = null;
       let attempts = 0;
       const maxAttempts = 3;
@@ -466,8 +476,6 @@ export default function VideoUploadPage() {
       while (attempts < maxAttempts && !transcription) {
         try {
           attempts++;
-          console.log(`Transcription attempt ${attempts} for segment ${segmentIndex + 1}`);
-          
           const response = await fetch('/api/transcribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -476,7 +484,6 @@ export default function VideoUploadPage() {
 
           if (!response.ok) {
             const errorData = await response.json();
-            console.error(`Transcription error for segment ${segmentIndex + 1}:`, errorData);
             if (attempts === maxAttempts) {
               setMessage(`Failed to transcribe segment ${segmentIndex + 1} after ${maxAttempts} attempts`);
               setSegmentSubtitles(prev => {
@@ -490,9 +497,7 @@ export default function VideoUploadPage() {
           }
 
           transcription = await response.json();
-          console.log(`Transcription for segment ${segmentIndex + 1}:`, transcription);
         } catch (error) {
-          console.error(`Error in transcription attempt ${attempts} for segment ${segmentIndex + 1}:`, error);
           if (attempts === maxAttempts) {
             setMessage(`Error transcribing segment ${segmentIndex + 1}: ${error.message}`);
             setSegmentSubtitles(prev => {
@@ -538,15 +543,12 @@ export default function VideoUploadPage() {
         setMessage(`Subtitles generated for segment ${segmentIndex + 1}.`);
       }
 
-      // Clean up the uploaded file from Supabase
       const { error: deleteError } = await supabase.storage
         .from('avatars')
         .remove([`input/${fileName}`]);
 
       if (deleteError) {
         console.warn(`Failed to delete segment ${fileName} from Supabase:`, deleteError);
-      } else {
-        console.log(`Deleted segment ${fileName} from Supabase`);
       }
     } catch (error) {
       console.error(`Error processing segment ${segmentIndex + 1}:`, error);
@@ -567,16 +569,15 @@ export default function VideoUploadPage() {
 
   const downloadSegmentWithRemotion = async (index) => {
     if (!segmentVideos[index]) return;
-  
+
     setMessage(`Preparing to render segment ${index + 1} with subtitles...`);
     setIsProcessing(true);
-  
+
     try {
       const segment = segmentVideos[index];
       const subtitles = segmentSubtitles[index] || [];
-      const subtitleStyle = subtitleStyles[index] || 'none';
+      const subtitleStyle = subtitleStyles[index] ?? 'none';
 
-      // Upload main video to Supabase
       const fileName = `segment_${index}_${Date.now()}.mp4`;
       const mainBlob = await fetch(segment.url).then(res => res.blob());
       const { data: mainUploadData, error: mainUploadError } = await supabase.storage
@@ -584,61 +585,55 @@ export default function VideoUploadPage() {
         .upload(`input/${fileName}`, mainBlob, {
           contentType: 'video/mp4'
         });
-  
+
       if (mainUploadError) {
         throw new Error(`Failed to upload main video to Supabase: ${mainUploadError.message}`);
       }
-  
+
       const { data: mainUrlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(`input/${fileName}`);
       
       const mainPublicUrl = mainUrlData.publicUrl;
       const mainVideoPath = `input/${fileName}`;
-      console.log(`Main video public URL: ${mainPublicUrl}`);
 
-      // Send render request
       const response = await fetch('/api/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           videoPath: mainVideoPath,
           subtitles,
-          subtitleStyle,
+          styleType: subtitleStyle,
           subtitlePosition: 'bottom',
           duration: segment.duration,
           segmentIndex: index
         })
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Render-video API error:', errorData);
-        throw new Error(errorData.message || 'Failed to process video rendering');
+        throw new Error(errorData.error || 'Failed to process video rendering');
       }
-  
+
       const blob = await response.blob();
       const downloadUrl = URL.createObjectURL(blob);
-  
+
       const a = document.createElement('a');
       a.href = downloadUrl;
       a.download = `reel_with_subtitle_${index + 1}.mp4`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-  
+
       URL.revokeObjectURL(downloadUrl);
       setMessage(`Segment ${index + 1} rendered and downloaded successfully.`);
 
-      // Clean up uploaded file from Supabase
       const { error: deleteError } = await supabase.storage
         .from('avatars')
         .remove([mainVideoPath]);
 
       if (deleteError) {
         console.warn(`Failed to delete file from Supabase:`, deleteError);
-      } else {
-        console.log(`Deleted file from Supabase: ${mainVideoPath}`);
       }
     } catch (error) {
       console.error('Error in downloadSegmentWithRemotion:', error);
@@ -660,6 +655,66 @@ export default function VideoUploadPage() {
       newStyles[index] = style;
       return newStyles;
     });
+  };
+
+  const handleAddSubtitle = (segmentIndex) => {
+    const segment = segmentVideos[segmentIndex];
+    if (!segment) return;
+
+    const start = parseFloat(newSubtitle.start);
+    const end = parseFloat(newSubtitle.end);
+
+    if (!newSubtitle.text || isNaN(start) || isNaN(end) || start < 0 || end > segment.duration || start >= end) {
+      setMessage('Please enter valid subtitle text and timing.');
+      return;
+    }
+
+    const newSub = { text: newSubtitle.text, start, end };
+    setSegmentSubtitles(prev => {
+      const newSubtitles = [...prev];
+      newSubtitles[segmentIndex] = [...(newSubtitles[segmentIndex] || []), newSub].sort((a, b) => a.start - b.start);
+      return newSubtitles;
+    });
+
+    setNewSubtitle({ text: '', start: '', end: '' });
+    setMessage(`Subtitle added to segment ${segmentIndex + 1}.`);
+  };
+
+  const handleEditSubtitle = (segmentIndex, subtitleIndex, updatedSubtitle) => {
+    const segment = segmentVideos[segmentIndex];
+    if (!segment) return;
+
+    const start = parseFloat(updatedSubtitle.start);
+    const end = parseFloat(updatedSubtitle.end);
+
+    if (!updatedSubtitle.text || isNaN(start) || isNaN(end) || start < 0 || end > segment.duration || start >= end) {
+      setMessage('Please enter valid subtitle text and timing.');
+      return;
+    }
+
+    setSegmentSubtitles(prev => {
+      const newSubtitles = [...prev];
+      newSubtitles[segmentIndex] = [
+        ...newSubtitles[segmentIndex].slice(0, subtitleIndex),
+        { text: updatedSubtitle.text, start, end },
+        ...newSubtitles[segmentIndex].slice(subtitleIndex + 1)
+      ].sort((a, b) => a.start - b.start);
+      return newSubtitles;
+    });
+
+    setMessage(`Subtitle updated in segment ${segmentIndex + 1}.`);
+  };
+
+  const handleDeleteSubtitle = (segmentIndex, subtitleIndex) => {
+    setSegmentSubtitles(prev => {
+      const newSubtitles = [...prev];
+      newSubtitles[segmentIndex] = [
+        ...newSubtitles[segmentIndex].slice(0, subtitleIndex),
+        ...newSubtitles[segmentIndex].slice(subtitleIndex + 1)
+      ];
+      return newSubtitles;
+    });
+    setMessage(`Subtitle deleted from segment ${segmentIndex + 1}.`);
   };
 
   const triggerVideoInput = () => {
@@ -699,7 +754,7 @@ export default function VideoUploadPage() {
           {sidebarOpen && (
             <div className="ml-3 flex-1 flex flex-col items-start overflow-hidden">
               <span className={`font-medium transition-all ${active ? 'text-white' : ''}`}>{label}</span>
-              {active && <div className="w month-8 h-0.5 bg-gradient-to-r from-purple-400 to-blue-400 mt-1 rounded-full"></div>}
+              {active && <div className="w-8 h-0.5 bg-gradient-to-r from-purple-400 to-blue-400 mt-1 rounded-full"></div>}
             </div>
           )}
           {active && sidebarOpen && (
@@ -728,7 +783,7 @@ export default function VideoUploadPage() {
               <div className="flex items-center">
                 <div className="relative w-12 h-12 mr-4 overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl shadow-lg shadow-purple-900/30 flex items-center justify-center">
-                    <Video size={24} className="text-white z-10" />
+                    <Video size={24} class implique="text-white z-10" />
                     <div className="absolute w-12 h-12 bg-white/20 rounded-full blur-lg animate-pulse"></div>
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-blue-500/40"></div>
                   </div>
@@ -976,19 +1031,27 @@ export default function VideoUploadPage() {
             </div>
 
             {selectedOption === 'single' && (
-              <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 mb-8 transition-all animate-fadeIn">
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-semibold mb-2">Upload Video</h2>
-                  <p className="text-gray-400">Select or drag and drop your video to automatically split it into Instagram Reels</p>
+              <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 mb-8 transition-all animate-fadeIn relative overflow-hidden">
+                {/* Dynamic background with vibrant effects */}
+                <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-900/30 rounded-full filter blur-3xl animate-pulse"></div>
+                <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-900/30 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+                <div className="absolute top-1/3 right-1/3 w-64 h-64 bg-purple-700/20 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+                <div className="absolute bottom-1/3 left-1/3 w-48 h-48 bg-blue-700/20 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '3s' }}></div>
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-r from-purple-900/10 to-blue-900/10 rounded-full filter blur-3xl"></div>
+
+                <div className="text-center mb-6 relative z-10">
+                  <h2 className="text-2xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300">Upload Your Reel</h2>
+                  <p className="text-gray-400">Drag and drop your video to create an Instagram Reel with AI enhancements.</p>
                 </div>
 
-                <div 
-                  className={`border-2 border-dashed ${dragActive ? 'border-purple-500 bg-purple-900/10' : 'border-gray-700 hover:border-purple-400/40'} 
-                  rounded-xl p-8 transition-all duration-300 text-center`}
+                <motion.div 
+                  className={`border-2 border-dashed rounded-xl py-16 px-8 text-center transition-all relative z-10 ${dragActive ? 'border-purple-500 bg-purple-900/20 shadow-xl shadow-purple-900/40' : 'border-gray-700'}`}
                   onDragEnter={handleDragEnter}
                   onDragLeave={handleDragLeave}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={handleDrop}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
                 >
                   <input 
                     type="file" 
@@ -1000,19 +1063,36 @@ export default function VideoUploadPage() {
                   
                   {!uploadedVideo && (
                     <div>
-                      <div className="mx-auto w-16 h-16 bg-purple-900/20 rounded-full flex items-center justify-center mb-4">
-                        <Upload size={28} className="text-purple-400" />
-                      </div>
-                      <p className="text-gray-300 mb-4">Drag and drop your video here or</p>
-                      <button 
-                        onClick={triggerVideoInput}
-                        className="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-medium transition-all shadow-lg shadow-purple-900/30 hover:shadow-purple-900/50"
+                      <motion.div 
+                        animate={pulseAnimation}
+                        className="mx-auto w-32 h-32 bg-gradient-to-br from-purple-900/40 to-blue-900/40 rounded-full flex items-center justify-center mb-8 relative group"
                       >
-                        Select Video
-                      </button>
-                      <p className="mt-4 text-sm text-gray-500">Supports MP4, MOV, AVI up to 1GB</p>
+                        <div className="absolute inset-0 rounded-full border-2 border-dashed border-purple-500/50 animate-spin-slow"></div>
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500/30 to-blue-500/30 opacity-0 group-hover:opacity-100 scale-110 transition-all duration-300"></div>
+                        <Upload size={40} className="text-purple-400 group-hover:scale-110 transition-all duration-300" />
+                      </motion.div>
+                      <h4 className="text-2xl font-medium mb-3 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300">Drag your reel here</h4>
+                      <p className="text-gray-400 mb-10 max-w-lg mx-auto leading-relaxed">
+                        Upload your video for Instagram Reels. We support vertical format videos (9:16) and other aspect ratios. Your reel will be processed with AI enhancements in minutes.
+                      </p>
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={triggerVideoInput}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium py-4 px-10 rounded-lg transition-all shadow-xl shadow-purple-900/30 hover:shadow-purple-900/50 relative overflow-hidden group"
+                      >
+                        <span className="relative z-10 flex items-center justify-center text-lg">
+                          <Zap size={22} className="mr-2" />
+                          Select Reel
+                        </span>
+                        <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-purple-500/0 via-white/20 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 transform -translate-x-full group-hover:translate-x-full"></div>
+                      </motion.button>
+                      <p className="text-xs text-gray-500 mt-6">
+                        By uploading, you agree to our Terms of Service
+                      </p>
                     </div>
                   )}
+                  
                   
                   {uploadedVideo && videoInfo && (
                     <div>
@@ -1038,7 +1118,7 @@ export default function VideoUploadPage() {
                       )}
                     </div>
                   )}
-                </div>
+                </motion.div>
 
                 {isProcessing && (
                   <div className="mt-6 animate-fadeIn">
@@ -1059,7 +1139,7 @@ export default function VideoUploadPage() {
                 {segmentVideos.length > 0 && (
                   <div className="mt-8 animate-fadeIn">
                     <h3 className="text-xl font-semibold mb-4">Instagram Reels Segments</h3>
-                    <p className="text-gray-400 mb-6">Your video has been split into {segmentVideos.length} Instagram Reels format clips. Generate subtitles and choose a style for each segment.</p>
+                    <p className="text-gray-400 mb-6">Your video has been split into {segmentVideos.length} Instagram Reels format clips. Generate or manually add subtitles and choose a style for each segment.</p>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {segmentVideos.map((segment, index) => (
@@ -1111,19 +1191,115 @@ export default function VideoUploadPage() {
                                 <option value="minimalPop">Minimal Pop</option>
                               </select>
                             </div>
-                            
+
                             <div className="mb-4">
-                              <label className="text-sm text-gray-400 block mb-1">Subtitles</label>
-                              <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-gray-300 h-20 overflow-auto">
-                                {segmentSubtitles[index]?.length > 0 ? (
-                                  segmentSubtitles[index].map((sub, i) => (
-                                    <div key={i}>{`${sub.start.toFixed(1)}s - ${sub.end.toFixed(1)}s: ${sub.text}`}</div>
-                                  ))
-                                ) : (
-                                  <span className="text-gray-500">No subtitles generated</span>
-                                )}
-                              </div>
+                              <button
+                                onClick={() => setEditingSegmentIndex(editingSegmentIndex === index ? null : index)}
+                                className="w-full py-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-white font-medium transition-all flex items-center justify-center"
+                              >
+                                {editingSegmentIndex === index ? 'Close Subtitle Editor' : 'Edit Subtitles'}
+                              </button>
                             </div>
+
+                            {editingSegmentIndex === index && (
+                              <div className="mb-4 p-4 bg-gray-800 rounded-lg">
+                                <h5 className="text-sm font-medium mb-2">Add New Subtitle</h5>
+                                <div className="grid grid-cols-3 gap-2 mb-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Subtitle text"
+                                    value={newSubtitle.text}
+                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, text: e.target.value })}
+                                    className="col-span-3 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                  />
+                                  <input
+                                    type="number"
+                                    placeholder="Start (s)"
+                                    value={newSubtitle.start}
+                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, start: e.target.value })}
+                                    className="bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                    step="0.1"
+                                    min="0"
+                                    max={segment.duration}
+                                  />
+                                  <input
+                                    type="number"
+                                    placeholder="End (s)"
+                                    value={newSubtitle.end}
+                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, end: e.target.value })}
+                                    className="bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                    step="0.1"
+                                    min="0"
+                                    max={segment.duration}
+                                  />
+                                  <button
+                                    onClick={() => handleAddSubtitle(index)}
+                                    className="bg-purple-600 hover:bg-purple-500 rounded-lg p-2 text-sm text-white"
+                                  >
+                                    Add
+                                  </button>
+                                </div>
+
+                                <div className="mb-2">
+                                  <h5 className="text-sm font-medium mb-1">Timeline</h5>
+                                  <div className="relative h-8 bg-gray-700 rounded-lg">
+                                    {segmentSubtitles[index]?.map((sub, i) => (
+                                      <div
+                                        key={i}
+                                        className="absolute h-8 bg-purple-500 rounded-lg"
+                                        style={{
+                                          left: `${(sub.start / segment.duration) * 100}%`,
+                                          width: `${((sub.end - sub.start) / segment.duration) * 100}%`
+                                        }}
+                                        title={`${sub.text} (${sub.start.toFixed(1)}s - ${sub.end.toFixed(1)}s)`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="max-h-40 overflow-auto">
+                                  <h5 className="text-sm font-medium mb-1">Existing Subtitles</h5>
+                                  {segmentSubtitles[index]?.length > 0 ? (
+                                    segmentSubtitles[index].map((sub, i) => (
+                                      <div key={i} className="flex items-center gap-2 mb-2">
+                                        <input
+                                          type="text"
+                                          value={sub.text}
+                                          onChange={(e) => handleEditSubtitle(index, i, { ...sub, text: e.target.value })}
+                                          className="flex-1 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                        />
+                                        <input
+                                          type="number"
+                                          value={sub.start}
+                                          onChange={(e) => handleEditSubtitle(index, i, { ...sub, start: e.target.value })}
+                                          className="w-20 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                          step="0.1"
+                                          min="0"
+                                          max={segment.duration}
+                                        />
+                                        <input
+                                          type="number"
+                                          value={sub.end}
+                                          onChange={(e) => handleEditSubtitle(index, i, { ...sub, end: e.target.value })}
+                                          className="w-20 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
+                                          step="0.1"
+                                          min="0"
+                                          max={segment.duration}
+                                        />
+                                        <button
+                                          onClick={() => handleDeleteSubtitle(index, i)}
+                                          className="bg-red-600 hover:bg-red-500 rounded-lg p-2 text-sm text-white"
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-gray-500">No subtitles added</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                             
                             <button
                               onClick={() => generateSubtitles(index)}

@@ -1,27 +1,16 @@
 import { useCurrentFrame, useVideoConfig } from 'remotion';
 
-interface Subtitle {
-  text: string;
-  start: number;
-  end: number;
-}
-
-interface SubtitleOverlayProps {
-  subtitles: Subtitle[];
-  styleType: 'hormozi' | 'abdaal' | 'neonGlow' | 'retroWave' | 'minimalPop' | 'none';
-}
-
-const SubtitleOverlay = ({ subtitles, styleType }: SubtitleOverlayProps) => {
+const SubtitleOverlay = ({ subtitles, styleType }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const activeSubtitle = subtitles.find(subtitle => {
+  const activeSubtitle = subtitles.find((subtitle) => {
     const startFrame = Math.floor(subtitle.start * fps);
     const endFrame = Math.floor(subtitle.end * fps);
     return frame >= startFrame && frame <= endFrame;
   });
 
-  const styles: Record<string, React.CSSProperties> = {
+  const styles = {
     hormozi: {
       position: 'absolute',
       left: '10%',
@@ -40,7 +29,7 @@ const SubtitleOverlay = ({ subtitles, styleType }: SubtitleOverlayProps) => {
       border: '4px solid #FFD700',
       zIndex: 10,
       opacity: activeSubtitle ? 1 : 0,
-      transition: 'opacity 0.2s ease-in-out'
+      transition: 'opacity 0.2s ease-in-out',
     },
     abdaal: {
       position: 'absolute',
@@ -57,9 +46,9 @@ const SubtitleOverlay = ({ subtitles, styleType }: SubtitleOverlayProps) => {
       backgroundColor: 'rgba(0, 0, 0, 0.6)',
       borderRadius: '10px',
       border: '2px solid #FFFFFF',
-      zIndex: '10',
+      zIndex: 10,
       opacity: activeSubtitle ? 1 : 0,
-      transition: 'opacity 0.2s ease-in-out'
+      transition: 'opacity 0.2s ease-in-out',
     },
     neonGlow: {
       position: 'absolute',
@@ -79,7 +68,7 @@ const SubtitleOverlay = ({ subtitles, styleType }: SubtitleOverlayProps) => {
       zIndex: 10,
       opacity: activeSubtitle ? 1 : 0,
       transition: 'opacity 0.3s ease-in-out',
-      animation: activeSubtitle ? 'neonFlicker 1.5s infinite alternate' : 'none'
+      animation: activeSubtitle ? 'neonFlicker 1.5s infinite alternate' : 'none',
     },
     retroWave: {
       position: 'absolute',
@@ -100,7 +89,7 @@ const SubtitleOverlay = ({ subtitles, styleType }: SubtitleOverlayProps) => {
       opacity: activeSubtitle ? 1 : 0,
       transition: 'opacity 0.2s ease-in-out',
       filter: 'contrast(1.2)',
-      letterSpacing: '2px'
+      letterSpacing: '2px',
     },
     minimalPop: {
       position: 'absolute',
@@ -120,7 +109,7 @@ const SubtitleOverlay = ({ subtitles, styleType }: SubtitleOverlayProps) => {
       zIndex: 10,
       opacity: activeSubtitle ? 1 : 0,
       transition: 'opacity 0.3s ease-in-out, transform 0.2s ease-in-out',
-      transform: activeSubtitle ? 'scale(1)' : 'scale(0.95)'
+      transform: activeSubtitle ? 'scale(1)' : 'scale(0.95)',
     },
     none: {
       position: 'absolute',
@@ -138,11 +127,11 @@ const SubtitleOverlay = ({ subtitles, styleType }: SubtitleOverlayProps) => {
       borderRadius: '8px',
       zIndex: 10,
       opacity: activeSubtitle ? 1 : 0,
-      transition: 'opacity 0.2s ease-in-out'
-    }
+      transition: 'opacity 0.2s ease-in-out',
+    },
   };
 
-  return <div style={styles[styleType] || styles.none}>{activeSubtitle ? activeSubtitle.text : ''}</div>;
+  return <div style={styles[styleType] || styles.none}>{activeSubtitle?.text || ''}</div>;
 };
 
 export default SubtitleOverlay;

@@ -42,15 +42,14 @@ jobs:
       - name: Render Video with Remotion
         env:
           SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
-          SUBTITLE_POSITION: ${{ github.event.client_payload.subtitlePosition }}
+          STYLE_TYPE: ${{ github.event.client_payload.styleType }}
           OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
           VIDEO_PATH: "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
         run: |
           echo "Subtitles received: $SUBTITLES"
           npx remotion render VideoWithSubtitles \
-            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"subtitles\": $SUBTITLES, \"subtitlePosition\": \"$SUBTITLE_POSITION\"}" \
-            --output="$SUBTITLE_POSITION.mp4"
-        
+            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"subtitles\": $SUBTITLES, \"styleType\": \"$STYLE_TYPE\", \"duration\": ${{ github.event.client_payload.duration }}}" \
+            --output="$STYLE_TYPE.mp4"
 
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4

@@ -3,11 +3,16 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const { videoPath, subtitles, subtitlePosition, segmentIndex, duration } = await request.json();
-    console.log('Render-video API received:', { videoPath, subtitles, subtitlePosition, segmentIndex, duration });
+    const { videoPath, subtitles, styleType, segmentIndex, duration } = await request.json();
+    console.log('Render-video API received:', { videoPath, subtitles, styleType, segmentIndex, duration });
 
     if (!videoPath || !duration) {
       return NextResponse.json({ error: 'Video path and duration are required' }, { status: 400 });
+    }
+
+    const validStyles = ['none', 'hormozi', 'abdaal', 'neonGlow', 'retroWave', 'minimalPop'];
+    if (!validStyles.includes(styleType)) {
+      return NextResponse.json({ error: `Invalid styleType. Must be one of: ${validStyles.join(', ')}` }, { status: 400 });
     }
 
     if (!subtitles || !Array.isArray(subtitles) || subtitles.some(s => !s.text || !s.start || !s.end)) {
@@ -17,15 +22,13 @@ export async function POST(request) {
     const props = {
       videoPath,
       subtitles: subtitles && Array.isArray(subtitles) ? subtitles : [],
-      subtitlePosition: subtitlePosition || 'bottom',
+      styleType,
       duration,
       outputFile: `rendered_${segmentIndex}_${Date.now()}.mp4`
     };
     console.log('Dispatching workflow with props:', JSON.stringify(props));
 
-
-    const githubToken = '';
-
+    const githubToken =  '';
     const repoOwner = 'souravmaji1';
     const repoName = 'Videosync';
 

@@ -1,17 +1,23 @@
 import { AbsoluteFill, Composition, useVideoConfig, Video as RemotionVideo } from 'remotion';
 import SubtitleOverlay from '../components/SubtitleOverlay';
 
-type VideoCompositionProps = {
+interface Subtitle {
+  text: string;
+  start: number;
+  end: number;
+}
+
+interface VideoCompositionProps {
   videoUrl: string;
-  subtitles: { text: string; start: number; end: number }[];
-  subtitlePosition: 'top' | 'middle' | 'bottom';
+  subtitles: Subtitle[];
+  styleType: 'hormozi' | 'abdaal' | 'neonGlow' | 'retroWave' | 'minimalPop' | 'none';
   duration: number; // Duration in seconds
-};
+}
 
 export const VideoComposition = ({
   videoUrl,
   subtitles,
-  subtitlePosition,
+  styleType,
   duration
 }: VideoCompositionProps) => {
   const { width, height, fps, durationInFrames } = useVideoConfig();
@@ -20,7 +26,7 @@ export const VideoComposition = ({
   console.log('VideoComposition rendering:', {
     videoUrl,
     subtitles,
-    subtitlePosition,
+    styleType,
     duration,
     durationInFrames,
     expectedDurationInFrames,
@@ -37,7 +43,7 @@ export const VideoComposition = ({
         endAt={durationInFrames}
         onError={(e) => console.error('Remotion Video load error:', e)}
       />
-      <SubtitleOverlay subtitles={subtitles} position={subtitlePosition} />
+      <SubtitleOverlay subtitles={subtitles} styleType={styleType} />
     </AbsoluteFill>
   );
 };
@@ -54,7 +60,7 @@ export const RemotionComposition = () => {
       defaultProps={{
         videoUrl: '',
         subtitles: [],
-        subtitlePosition: 'bottom',
+        styleType: 'none',
         duration: 30
       }}
     />

@@ -36,9 +36,27 @@ jobs:
           echo "Audio URL: $AUDIO_URL"
           echo "Duration: $DURATION"
           echo "Audio Volume: $AUDIO_VOLUME"
+
+          # Create a JSON file for props
+          node -e "
+            const fs = require('fs');
+            const props = {
+              videoUrls: ${VIDEO_URLS},
+              audioUrl: '${AUDIO_URL}',
+              audioVolume: ${AUDIO_VOLUME || 'null'},
+              images: ${IMAGES},
+              subtitles: ${SUBTITLES},
+              styleType: '${SUBTITLE_STYLE}',
+              duration: ${DURATION},
+              imageDuration: ${IMAGE_DURATION || 'null'}
+            };
+            fs.writeFileSync('props.json', JSON.stringify(props));
+          "
+
+          # Run Remotion render with the JSON file
           npx remotion render VideoWithSubtitles \
-            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"audioVolume\": $AUDIO_VOLUME, \"images\": $IMAGES, \"subtitles\": $SUBTITLES, \"styleType\": \"$SUBTITLE_STYLE\", \"duration\": $DURATION, \"imageDuration\": $IMAGE_DURATION}" \
-            --output="rendered-video.mp4"
+            --props=props.json \
+            --output=rendered-video.mp4
 
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4

@@ -1,7 +1,9 @@
-import { AbsoluteFill, useVideoConfig, Video as RemotionVideo, Img, Sequence, Audio } from 'remotion';
-import SubtitleOverlay from '../components/SubtitleOverlay';
-import { Composition } from 'remotion';
+// src/remotion/Composition.jsx
 
+import { Composition, AbsoluteFill, useVideoConfig, Video as RemotionVideo, Img, Sequence, Audio } from 'remotion';
+import SubtitleOverlay from '../components/SubtitleOverlay';
+
+// VideoComposition component for rendering video or image slideshow
 export const VideoComposition = ({
   videoUrls,
   images,
@@ -10,10 +12,25 @@ export const VideoComposition = ({
   duration,
   imageDuration = 3, // Default 3 seconds per image
   audioUrl,
-  audioVolume = 1 // Default volume
+  audioVolume = 1, // Default volume
 }) => {
   const { fps } = useVideoConfig();
-  const frameRate = 30;
+
+  // Log props for debugging
+  console.log('VideoComposition props:', {
+    videoUrls,
+    images,
+    subtitles,
+    styleType,
+    duration,
+    imageDuration,
+    audioUrl,
+    audioVolume,
+    fps,
+  });
+
+  // Validate duration
+  const safeDuration = Number(duration) || 30; // Fallback to 30 seconds
 
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
@@ -23,24 +40,24 @@ export const VideoComposition = ({
           src={audioUrl}
           volume={audioVolume}
           startFrom={0}
-          endAt={Math.ceil(duration * frameRate)}
+          endAt={Math.ceil(safeDuration * fps)}
           onError={(e) => console.error('Audio load error:', e)}
         />
       )}
 
       {/* Video mode */}
-      {videoUrls && Array.isArray(videoUrls) && (
+      {videoUrls && Array.isArray(videoUrls) && videoUrls.length > 0 && (
         <>
           {videoUrls.map((video, index) => (
             <Sequence
               key={index}
-              from={Math.floor(video.start * frameRate)}
-              durationInFrames={Math.floor((video.end - video.start) * frameRate)}
+              from={Math.floor((video.start || 0) * fps)}
+              durationInFrames={Math.floor(((video.end || safeDuration) - (video.start || 0)) * fps)}
             >
               <RemotionVideo
-                src={video.src}
+                src={video.src || video}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={(e) => console.error(`Remotion Video load error for ${video.src}:`, e)}
+                onError={(e) => console.error(`Remotion Video load error for ${video.src || video}:`, e)}
               />
             </Sequence>
           ))}
@@ -49,13 +66,13 @@ export const VideoComposition = ({
       )}
 
       {/* Image slideshow mode */}
-      {images && images.length > 0 && (
+      {(!videoUrls || videoUrls.length === 0) && images && images.length > 0 && (
         <>
           {images.map((img, index) => (
             <Sequence
               key={index}
-              from={index * imageDuration * frameRate}
-              durationInFrames={imageDuration * frameRate}
+              from={index * imageDuration * fps}
+              durationInFrames={imageDuration * fps}
             >
               <Img
                 src={img}
@@ -70,16 +87,32 @@ export const VideoComposition = ({
           <SubtitleOverlay subtitles={subtitles} styleType={styleType} />
         </>
       )}
+
+      {/* Fallback if no videos or images */}
+      {(!videoUrls || videoUrls.length === 0) && (!images || images.length === 0) && (
+        <div style={{ width: '100%', height: '100%', backgroundColor: '#111' }} />
+      )}
     </AbsoluteFill>
   );
 };
 
-export const RemotionComposition = ({ videoUrls, audioUrl, audioVolume, images, subtitles, styleType, duration, imageDuration }) => {
-  // Ensure duration is a number and calculate durationInFrames
-  const fps = 30;
-  const durationInFrames = Math.ceil(Number(duration) * fps);
- 
-  console.log('RemotionRoot props:', {
+// RemotionComposition component for composition setup
+export const RemotionComposition = ({
+  videoUrls,
+  audioUrl,
+  audioVolume,
+  images,
+  subtitles,
+  styleType,
+  duration,
+  imageDuration,
+}) => {
+  const fps = 30; // Define fps before usage
+  const safeDuration = Number(duration) || 30; // Fallback to 30 seconds
+  const durationInFrames = Math.ceil(safeDuration * fps);
+
+  // Log props for debugging
+  console.log('RemotionComposition props:', {
     videoUrls,
     audioUrl,
     audioVolume,
@@ -87,11 +120,12 @@ export const RemotionComposition = ({ videoUrls, audioUrl, audioVolume, images, 
     subtitles,
     styleType,
     duration,
+    safeDuration,
     durationInFrames,
     durationType: typeof duration,
   });
-const defaultDuration = 30; // Fallback duration in seconds
-  // Validate inputs
+
+  // Validate durationInFrames
   if (isNaN(durationInFrames) || durationInFrames <= 0) {
     console.error('Invalid durationInFrames:', durationInFrames);
     throw new Error('Duration must be a positive number');
@@ -106,17 +140,16 @@ const defaultDuration = 30; // Fallback duration in seconds
       width={606}
       height={1080}
       defaultProps={{
-          videoUrls: [],
-          images: [],
-          subtitles: [],
-          styleType: 'none',
-          duration: defaultDuration,
-          imageDuration: 3,
-          audioUrl: '',
-          audioVolume: 1
-        }}
+        videoUrls: Array.isArray(videoUrls) ? videoUrls : [],
+        images: Array.isArray(images) ? images : [],
+        subtitles: Array.isArray(subtitles) ? subtitles : [],
+        styleType: styleType || 'none',
+        duration: safeDuration,
+        imageDuration: Number(imageDuration) || 3,
+        audioUrl: audioUrl || '',
+        audioVolume: Number(audioVolume) || 1,
+      }}
     />
   );
 };
-
 

@@ -74,20 +74,37 @@ export const VideoComposition = ({
   );
 };
 
-export const RemotionComposition = () => {
-  const fps = 30;
-  const defaultDuration = 30; // Fallback duration in seconds
+export const RemotionComposition = ({ videoUrls, audioUrl, audioVolume, images, subtitles, styleType, duration, imageDuration }) => {
+  // Ensure duration is a number and calculate durationInFrames
+  const durationInFrames = Math.ceil(Number(duration) * fps);
+
+  console.log('RemotionRoot props:', {
+    videoUrls,
+    audioUrl,
+    audioVolume,
+    images,
+    subtitles,
+    styleType,
+    duration,
+    durationInFrames,
+    durationType: typeof duration,
+  });
+const defaultDuration = 30; // Fallback duration in seconds
+  // Validate inputs
+  if (isNaN(durationInFrames) || durationInFrames <= 0) {
+    console.error('Invalid durationInFrames:', durationInFrames);
+    throw new Error('Duration must be a positive number');
+  }
 
   return (
-    <>
-      <Composition
-        id="VideoWithSubtitles"
-        component={VideoComposition}
-        durationInFrames={(props) => Math.ceil((props.duration || defaultDuration) * fps)} // Dynamic duration based on prop
-        fps={fps}
-        width={606}
-        height={1080}
-        defaultProps={{
+    <Composition
+      id="VideoWithSubtitles"
+      component={VideoComposition}
+      durationInFrames={durationInFrames}
+      fps={fps}
+      width={606}
+      height={1080}
+      defaultProps={{
           videoUrls: [],
           images: [],
           subtitles: [],
@@ -97,8 +114,7 @@ export const RemotionComposition = () => {
           audioUrl: '',
           audioVolume: 1
         }}
-      />
-    </>
+    />
   );
 };
 

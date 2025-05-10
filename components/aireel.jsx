@@ -197,6 +197,7 @@ const renderAllSegments = async () => {
     const fileName = `video_${user?.id || 'anonymous'}_${Date.now()}.mp4`;
     const props = {
       images: generatedImages,
+      videoUrls: [],
       audioUrl,
       subtitles,
       styleType: subtitleStyle,

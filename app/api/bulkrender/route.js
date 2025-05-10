@@ -104,18 +104,17 @@ export async function POST(request) {
           console.log(`Workflow triggered for segment , run ID:`, workflowRunId);
 
           // Store workflow ID in Supabase
-          const { error: insertError } = await supabase
-            .from('render_workflows')
-            .insert({
-              user_id: userId,
-              workflow_id: workflowRunId,
-              segment_index: '',
-              status: 'queued',
-              created_at: new Date().toISOString(),
-              output_file: props.outputFile,
-              title: title || '',
-              description: description || ''
-            });
+          const inserts = segments.map((segment, index) => ({
+  user_id: userId,
+  workflow_id: workflowRunId,
+  segment_index: index,
+  status: 'queued',
+  created_at: new Date().toISOString(),
+  output_file: props.outputFile,
+  title: segment.title || '',
+  description: segment.description || ''
+}));
+const { error } = await supabase.from('render_workflows').insert(inserts);
 
           if (insertError) {
             console.error(`Failed to store workflow ID for segment :`, insertError);

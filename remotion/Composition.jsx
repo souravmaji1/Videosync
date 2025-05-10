@@ -77,7 +77,7 @@ export const VideoComposition = ({
 export const RemotionComposition = ({ videoUrls, audioUrl, audioVolume, images, subtitles, styleType, duration, imageDuration }) => {
   // Ensure duration is a number and calculate durationInFrames
   const durationInFrames = Math.ceil(Number(duration) * fps);
-
+ const fps = 30;
   console.log('RemotionRoot props:', {
     videoUrls,
     audioUrl,

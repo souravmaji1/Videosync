@@ -1,4 +1,3 @@
-// app/api/youtube/upload/route.ts
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
@@ -39,11 +38,9 @@ export async function POST(request: Request) {
 
     // Validate and sanitize the title
     let sanitizedTitle = title ? title.trim() : '';
-    // If the title is empty after trimming or wasn't provided, use a default
     if (!sanitizedTitle) {
       sanitizedTitle = 'My Video ' + new Date().toISOString().split('T')[0];
     }
-    // Make sure the title meets YouTube's requirements (length etc.)
     if (sanitizedTitle.length > 100) {
       sanitizedTitle = sanitizedTitle.substring(0, 97) + '...';
     }
@@ -68,18 +65,23 @@ export async function POST(request: Request) {
         mimeType: contentType,
       },
     }, {
-      // Add upload timeout and handling
       timeout: 180000, // 3 minutes timeout
       onUploadProgress: (evt) => {
         console.log(`Upload progress: ${evt.bytesRead}`);
       }
     });
 
-    return NextResponse.json(response.data);
+    const videoId = response.data.id; // Extract YouTube video ID
+
+    console.log('Video uploaded successfully:', response.data);
+
+    return NextResponse.json({
+      ...response.data,
+      youtubeVideoId: videoId // Include video ID in response
+    });
   } catch (error) {
     console.error('Error uploading video:', error.message);
     
-    // Return more detailed error information
     return NextResponse.json({ 
       error: 'Failed to upload video', 
       details: error.message || error.toString() 

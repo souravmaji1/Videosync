@@ -2,9 +2,9 @@ import { createClient } from "@deepgram/sdk";
 
 export async function POST(request) {
   try {
-    const { videoUrl, segmentStart } = await request.json();
+    const { audioUrl, segmentStart } = await request.json();
 
-    if (!videoUrl || segmentStart === undefined) {
+    if (!audioUrl || segmentStart === undefined) {
       return new Response(JSON.stringify({ error: "Missing videoUrl or segmentStart" }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -16,7 +16,7 @@ export async function POST(request) {
 
     // Transcribe the video
     const { result, error } = await deepgram.listen.prerecorded.transcribeUrl(
-      { url: videoUrl },
+      { url: audioUrl },
       {
         model: "nova-3",
         punctuate: true,

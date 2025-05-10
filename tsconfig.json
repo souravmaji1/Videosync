@@ -31,7 +31,7 @@
     ".next/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx"
-, "app/allblogs/interview/[interviewId]/feedback/page.jsx", "components/ui/popover.jsx", "components/ui/card.tsx", "app/test/page.jsx", "app/page.js", "remotion/Composition.jsx"  ],
+, "app/allblogs/interview/[interviewId]/feedback/page.jsx", "components/ui/popover.jsx", "components/ui/card.tsx", "app/test/page.jsx", "app/page.js", "remotion/Composition.jsx", "components/Caption.jsx", "components/aireel.jsx"  ],
   "exclude": [
     "node_modules"
   ]

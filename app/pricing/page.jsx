@@ -368,7 +368,7 @@ export default function VideoUploadPage() {
 
     try {
       const segmentDuration = 30;
-      const maxSegments = Math.min(4, Math.ceil(videoInfo.duration / segmentDuration));
+      const maxSegments = Math.min(1, Math.ceil(videoInfo.duration / segmentDuration));
       setMessage(`Splitting into ${maxSegments} segment(s) of up to 30 seconds each for Instagram Reels...`);
       
       const videoData = await fetchFile(uploadedVideo);

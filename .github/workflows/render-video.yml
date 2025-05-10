@@ -20,43 +20,30 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
-
-      - name: Download Video from Supabase
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: |
-          VIDEO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
-          echo "Downloading video from $VIDEO_URL"
-          curl -L -o input.mp4 "$VIDEO_URL" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
-            --fail --silent --show-error
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to download video from Supabase"
-            exit 1
-          fi
-          ls -l input.mp4  # Verify the file exists
-
       - name: Render Video with Remotion
         env:
-          SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
-          STYLE_TYPE: ${{ github.event.client_payload.styleType }}
-          OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
-          VIDEO_PATH: "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
+          VIDEO_URLS: ${{ toJson(github.event.client_payload.videoUrls) }}
+          AUDIO_URL: ${{ github.event.client_payload.audioUrl }}
+          IMAGES: ${{ github.event.client_payload.images }}
+          DURATION: ${{ github.event.client_payload.duration }}
+          IMAGE_DURATION: ${{ github.event.client_payload.imageDuration }}
+          SUBTITLES: ${{ github.event.client_payload.subtitles }}
+          SUBTITLE_STYLE: ${{ github.event.client_payload.styleType }}
+          AUDIO_VOLUME: ${{ github.event.client_payload.audioVolume }}
         run: |
-          echo "Subtitles received: $SUBTITLES"
+          echo "Rendering video with props:"
+          echo "Video URLs: $VIDEO_URLS"
+          echo "Audio URL: $AUDIO_URL"
+          echo "Duration: $DURATION"
+          echo "Audio Volume: $AUDIO_VOLUME"
+          echo "Output File: $OUTPUT_FILE"
           npx remotion render VideoWithSubtitles \
-            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"subtitles\": $SUBTITLES, \"styleType\": \"$STYLE_TYPE\", \"duration\": ${{ github.event.client_payload.duration }}}" \
-            --output="$STYLE_TYPE.mp4"
-
+            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\",  \"audioVolume\": $AUDIO_VOLUME}", \"images\": $IMAGES, \"subtitles\": $SUBTITLES, \"styleType\": $SUBTITLE_STYLE, \"duration\": $DURATION, \"imageDuration\": $IMAGE_DURATION, \
+            --output="$SUBTITLE_STYLE.mp4"
+          
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: rendered-video
           path: "*.mp4"
           retention-days: 7
-
-
-

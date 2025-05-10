@@ -1,1 +1,13 @@
-{"videoUrl":"https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/input/segment_0_1746423773831.mp4","subtitles":[{"text":"Hello world","start":0,"end":2}],"subtitlePosition":"bottom","duration":30}
+{
+  "audioUrl": "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/user_2vJ7zMGd8wt97m26vnldmkts30s/1746684700549_dua.mp3",
+  "audioVolume": 0.5,
+  "images": [
+    "https://images.pexels.com/photos/2486168/pexels-photo-2486168.jpeg",
+    "https://images.pexels.com/photos/1629236/pexels-photo-1629236.jpeg",
+    "https://images.pexels.com/photos/36717/amazing-animal-beautiful-beautifull.jpg"
+  ],
+  "subtitles": [],
+  "styleType": "none",
+  "duration": 30,
+  "imageDuration": 3
+}

@@ -287,3 +287,106 @@ https://github.com/${repoOwner}/${repoName}/actions/runs/${workflowRunId}/artifa
 https://api.github.com/repos/souravmaji1/Videosync/actions/artifacts/3057833917/zip
 
 
+// Updated Hero Video Section with larger, more attractive reels
+<section className="min-h-screen py-20 relative overflow-hidden flex items-center">
+  {/* Background gradients */}
+  <div className="absolute inset-0 bg-gray-950"></div>
+  <div className="absolute top-0 left-1/4 w-1/2 h-1/2 bg-purple-900/20 rounded-full blur-3xl"></div>
+  <div className="absolute bottom-1/4 right-1/4 w-1/2 h-1/2 bg-blue-900/20 rounded-full blur-3xl"></div>
+  
+  {/* Grid pattern overlay */}
+  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNjAgMEgwdjYwaDYwVjB6IiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiLz48cGF0aCBkPSJNNTkuNSAwdjYwTTAgLjV2NTlNMCAwaDYwTTAgNjBoNjAiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPg==')]"></div>
+  
+  <div className="container mx-auto px-4 relative z-10">
+    <div className="flex flex-col md:flex-row items-center gap-12">
+      <div className="md:w-1/2">
+        <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-900/50 border border-gray-800 text-sm font-medium mb-4 backdrop-blur-sm">
+          <Sparkles size={16} className="mr-2 text-purple-400" />
+          <span>Revolutionary AI Video Platform</span>
+        </div>
+        <h1 className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight">
+          <span className="block">One video.</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-teal-400">Infinite potential.</span>
+        </h1>
+        <p className="text-gray-300 text-xl mb-8 max-w-xl">
+          Transform your content into platform-perfect videos for every social network. Create once, distribute everywhere with AI-powered optimization.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <a href="#signup" className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-4 rounded-full hover:from-purple-600 hover:to-blue-600 transition font-medium flex items-center justify-center">
+            <span>Start Creating Free</span>
+            <ArrowRight size={18} className="ml-2" />
+          </a>
+          <a href="#demo" className="w-full sm:w-auto flex items-center justify-center text-white px-6 py-4 rounded-full bg-gray-900/50 border border-gray-800 hover:bg-gray-800/50 transition backdrop-blur-sm">
+            <Play size={18} className="mr-2" />
+            <span>Watch Demo</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Enhanced Video Display Section */}
+      <div className="md:w-1/2 mt-12 md:mt-0">
+        <div className="relative w-full">
+          {/* Main featured video - larger size */}
+          <div className="relative mx-auto bg-gray-900 rounded-2xl overflow-hidden border-2 border-gray-800 shadow-2xl" style={{ maxWidth: "600px" }}>
+            <div className="relative w-full" style={{ paddingBottom: `${activeReel === 0 ? '177.78%' : activeReel === 1 ? '177.78%' : '56.25%'}` }}>
+              <video 
+                autoPlay 
+                muted 
+                loop 
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+                src={videoReels[activeReel].src}
+              />
+              
+              {/* Stylish platform indicator badge */}
+              <div className="absolute top-4 left-4 px-4 py-2 bg-black/60 backdrop-blur-sm rounded-full text-sm font-semibold border border-gray-700 flex items-center">
+                {activeReel === 0 && <Instagram size={16} className="mr-2 text-pink-400" />}
+                {activeReel === 1 && <TikTok size={16} className="mr-2 text-teal-400" />}
+                {activeReel === 2 && <Youtube size={16} className="mr-2 text-red-400" />}
+                <span>{videoReels[activeReel].platform}</span>
+              </div>
+              
+              {/* Video overlay with play button */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none"></div>
+              <div className="absolute inset-0 flex items-center justify-center group">
+                <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/20 transition group-hover:scale-110 duration-300">
+                  <Play size={32} className="text-white ml-1" />
+                </div>
+              </div>
+              
+              {/* Caption overlay */}
+              <div className="absolute bottom-0 inset-x-0 p-6 bg-gradient-to-t from-gray-900 to-transparent">
+                <div className="text-lg font-medium mb-2">Platform-Perfect Videos</div>
+                <div className="text-gray-300 text-sm">Optimized for {videoReels[activeReel].platform}'s algorithm</div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Decorative elements */}
+          <div className="absolute -z-10 -bottom-10 -left-10 w-64 h-64 bg-purple-500/30 rounded-full blur-3xl"></div>
+          <div className="absolute -z-10 -top-10 -right-10 w-64 h-64 bg-blue-500/30 rounded-full blur-3xl"></div>
+          
+          {/* Video Selection Controls - cleaner and more stylish */}
+          <div className="flex justify-center mt-8 space-x-4">
+            {videoReels.map((reel, index) => (
+              <button 
+                key={index}
+                onClick={() => selectReel(index)}
+                className={`px-4 py-2 rounded-lg transition-all ${
+                  activeReel === index 
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white' 
+                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800'
+                }`}
+              >
+                {index === 0 && <Instagram size={16} className="inline mr-2" />}
+                {index === 1 && <TikTok size={16} className="inline mr-2" />}
+                {index === 2 && <Youtube size={16} className="inline mr-2" />}
+                {reel.platform}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

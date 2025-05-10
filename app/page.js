@@ -36,12 +36,55 @@ import {
 
 } from 'lucide-react';
 
+
 export default function Home() {
   const [openFaq, setOpenFaq] = useState(null);
   const [activeTab, setActiveTab] = useState('features');
   const [scrolled, setScrolled] = useState(false);
   const [animateStats, setAnimateStats] = useState(false);
+  const [activeReel, setActiveReel] = useState(0);
   
+  // Example video reel data
+  const videoReels = [
+    {
+      platform: "Instagram",
+      src: "/one.mp4", // 9:16 aspect ratio for Instagram
+      position: "absolute -top-6 -left-6 w-40 rotate-6"
+    },
+    {
+      platform: "TikTok",
+      src: "/two.mp4", // 9:16 aspect ratio for TikTok
+      position: "absolute -bottom-4 -right-4 w-40 -rotate-6"
+    },
+    {
+      platform: "YouTube",
+      src: "/three.mp4", // 16:9 aspect ratio for YouTube
+      position: "absolute top-1/4 -right-10 w-40 rotate-12"
+    }
+  ];
+
+  // Auto-rotate through reels
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveReel((prev) => (prev + 1) % videoReels.length);
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Manual selection of reels
+  const selectReel = (index) => {
+    setActiveReel(index);
+  };
+
+  // Auto-rotate through reels
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveReel((prev) => (prev + 1) % videoReels.length);
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
   // Handle scroll effects
   useEffect(() => {
     const handleScroll = () => {
@@ -103,21 +146,21 @@ export default function Home() {
         title: "Neural Clip Detection",
         description: "Our advanced AI identifies the most engaging moments from your videos using attention mapping technology that predicts viewer engagement.",
         icon: <Sparkles className="text-purple-400" size={24} />,
-        image: "/api/placeholder/500/300",
+        image: "/john.webp",
         color: "from-purple-900 to-indigo-900"
       },
       {
         title: "Dynamic Captions",
         description: "Eye-catching animated captions with custom styles that follow your speech perfectly and automatically adapt to each platform's requirements.",
         icon: <MessageCircle className="text-blue-400" size={24} />,
-        image: "/api/placeholder/500/300",
+        image: "/kl.webp",
         color: "from-blue-900 to-cyan-900"
       },
       {
         title: "Intelligent Framing",
         description: "Smart reframing that keeps important subjects centered regardless of aspect ratio, ensuring your content looks perfect everywhere.",
         icon: <Smartphone className="text-teal-400" size={24} />,
-        image: "/api/placeholder/500/300",
+        image: "/jf.webp",
         color: "from-teal-900 to-emerald-900"
       }
     ],
@@ -300,77 +343,121 @@ export default function Home() {
 
       <main className="pt-20">
         {/* Hero Section */}
-        <section className="min-h-screen py-20 relative overflow-hidden flex items-center">
-          {/* Background gradients */}
-          <div className="absolute inset-0 bg-gray-950"></div>
-          <div className="absolute top-0 left-1/4 w-1/2 h-1/2 bg-purple-900/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-1/2 h-1/2 bg-blue-900/20 rounded-full blur-3xl"></div>
-          
-          {/* Grid pattern overlay */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNjAgMEgwdjYwaDYwVjB6IiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiLz48cGF0aCBkPSJNNTkuNSAwdjYwTTAgLjV2NTlNMCAwaDYwTTAgNjBoNjAiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPg==')]"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="flex flex-col md:flex-row items-center gap-12">
-              <div className="md:w-1/2">
-                <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-900/50 border border-gray-800 text-sm font-medium mb-4 backdrop-blur-sm">
-                  <Sparkles size={16} className="mr-2 text-purple-400" />
-                  <span>Revolutionary AI Video Platform</span>
-                </div>
-                <h1 className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight">
-                  <span className="block">One video.</span>
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-teal-400">Infinite potential.</span>
-                </h1>
-                <p className="text-gray-300 text-xl mb-8 max-w-xl">
-                  Transform your content into platform-perfect videos for every social network. Create once, distribute everywhere with AI-powered optimization.
-                </p>
-                <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                  <a href="#signup" className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-4 rounded-full hover:from-purple-600 hover:to-blue-600 transition font-medium flex items-center justify-center">
-                    <span>Start Creating Free</span>
-                    <ArrowRight size={18} className="ml-2" />
-                  </a>
-                  <a href="#demo" className="w-full sm:w-auto flex items-center justify-center text-white px-6 py-4 rounded-full bg-gray-900/50 border border-gray-800 hover:bg-gray-800/50 transition backdrop-blur-sm">
-                    <Play size={18} className="mr-2" />
-                    <span>Watch Demo</span>
-                  </a>
-                </div>
+    
+      
+<section className="min-h-screen py-20 relative overflow-hidden flex items-center">
+  {/* Background gradients */}
+  <div className="absolute inset-0 bg-gray-950"></div>
+  <div className="absolute top-0 left-1/4 w-1/2 h-1/2 bg-purple-900/20 rounded-full blur-3xl"></div>
+  <div className="absolute bottom-1/4 right-1/4 w-1/2 h-1/2 bg-blue-900/20 rounded-full blur-3xl"></div>
+  
+  {/* Grid pattern overlay */}
+  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNjAgMEgwdjYwaDYwVjB6IiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiLz48cGF0aCBkPSJNNTkuNSAwdjYwTTAgLjV2NTlNMCAwaDYwTTAgNjBoNjAiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIvPjwvc3ZnPg==')]"></div>
+  
+  <div className="container mx-auto px-4 relative z-10">
+    <div className="flex flex-col items-center">
+      {/* Headline section - centered */}
+      <div className="text-center mb-12 max-w-3xl mx-auto">
+        <div className="inline-flex items-center px-4 py-2 rounded-full bg-gray-900/50 border border-gray-800 text-sm font-medium mb-4 backdrop-blur-sm">
+          <Sparkles size={16} className="mr-2 text-purple-400" />
+          <span>Revolutionary AI Video Platform</span>
+        </div>
+        <h1 className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight">
+          <span className="block">One video.</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-blue-400 to-teal-400">Infinite potential.</span>
+        </h1>
+        <p className="text-gray-300 text-xl mb-8">
+          Transform your content into platform-perfect videos for every social network. Create once, distribute everywhere with AI-powered optimization.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <a href="/create" className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-blue-500 text-white px-8 py-4 rounded-full hover:from-purple-600 hover:to-blue-600 transition font-medium flex items-center justify-center">
+            <span>Start Creating Free</span>
+            <ArrowRight size={18} className="ml-2" />
+          </a>
+          <a href="#demo" className="w-full sm:w-auto flex items-center justify-center text-white px-6 py-4 rounded-full bg-gray-900/50 border border-gray-800 hover:bg-gray-800/50 transition backdrop-blur-sm">
+            <Play size={18} className="mr-2" />
+            <span>Watch Demo</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Extra large single featured video */}
+      <div className="w-full max-w-4xl mx-auto relative">
+        <div className="relative bg-gray-900 rounded-2xl overflow-hidden border-2 border-gray-800 shadow-2xl">
+          {/* Main video with 16:9 aspect ratio */}
+          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+            <video 
+              autoPlay 
+              muted 
+              loop 
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover"
+              src="one.mp4"
+            />
+            
+            {/* Stylish overlays */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none"></div>
+            
+            {/* Platform transformation animations */}
+            <div className="absolute top-4 right-4 flex space-x-2">
+              <div className="flex items-center px-4 py-2 bg-black/60 backdrop-blur-sm rounded-full text-sm font-semibold border border-gray-700">
+                <Instagram size={16} className="mr-2 text-pink-400" />
+                <span>Reels</span>
               </div>
-              <div className="md:w-1/2 flex justify-center">
-                <div className="relative">
-                  {/* Main video device */}
-                  <div className="relative bg-gray-900 rounded-xl overflow-hidden border border-gray-800 shadow-2xl">
-                    <div className="w-full max-w-lg">
-                      <div className="relative w-full" style={{ paddingBottom: '177.78%' }}>
-                        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-                          <img src="/api/placeholder/500/888" alt="Video Platform Preview" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/20 transition">
-                              <Play size={24} className="text-white ml-1" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Multiple platform previews floating around */}
-                  <div className="absolute -top-6 -left-6 bg-gray-900 rounded-lg overflow-hidden shadow-xl border border-gray-800 w-36 rotate-6 animate-float">
-                    <img src="/ghibli.jpg" alt="Instagram Preview" className="w-full" />
-                  </div>
-                  <div className="absolute -bottom-4 -right-4 bg-gray-900 rounded-lg overflow-hidden shadow-xl border border-gray-800 w-40 -rotate-6 animate-float-slow">
-                    <img src="/kl.webp" alt="TikTok Preview" className="w-full" />
-                  </div>
-                  <div className="absolute top-1/4 -right-10 bg-gray-900 rounded-lg overflow-hidden shadow-xl border border-gray-800 w-32 rotate-12 animate-float-delay">
-                    <img src="/john.webp" alt="YouTube Preview" className="w-full" />
-                  </div>
-                  
-                  {/* Decorative elements */}
-                  <div className="absolute -z-10 -bottom-10 -left-10 w-40 h-40 bg-purple-500/30 rounded-full blur-3xl"></div>
-                  <div className="absolute -z-10 -top-10 -right-10 w-40 h-40 bg-blue-500/30 rounded-full blur-3xl"></div>
+              <div className="flex items-center px-4 py-2 bg-black/60 backdrop-blur-sm rounded-full text-sm font-semibold border border-gray-700">
+                <TikTok size={16} className="mr-2 text-teal-400" />
+                <span>TikTok</span>
+              </div>
+              <div className="flex items-center px-4 py-2 bg-black/60 backdrop-blur-sm rounded-full text-sm font-semibold border border-gray-700">
+                <Youtube size={16} className="mr-2 text-red-400" />
+                <span>Shorts</span>
+              </div>
+            </div>
+            
+            {/* Play button overlay */}
+            <div className="absolute inset-0 flex items-center justify-center group">
+              <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center cursor-pointer hover:bg-white/20 transition transform group-hover:scale-110 duration-300">
+                <Play size={40} className="text-white ml-2" />
+              </div>
+            </div>
+            
+            {/* Dynamic caption simulation */}
+            <div className="absolute bottom-8 inset-x-0 px-8">
+              <div className="bg-black/40 backdrop-blur-sm rounded-xl p-4 border border-gray-800">
+                <div className="text-2xl font-semibold mb-2">
+                  Create once. Share <span className="text-purple-400">everywhere</span>.
+                </div>
+                <div className="text-gray-300">
+                  VideoSync optimizes your content for every platform automatically
                 </div>
               </div>
             </div>
           </div>
-        </section>
+        </div>
+        
+        {/* Video transformation indicators */}
+        <div className="flex justify-center mt-8 space-x-6">
+          <div className="text-center">
+            <div className="w-16 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mx-auto mb-2"></div>
+            <span className="text-sm text-gray-400">Auto-crops</span>
+          </div>
+          <div className="text-center">
+            <div className="w-16 h-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full mx-auto mb-2"></div>
+            <span className="text-sm text-gray-400">Smart captions</span>
+          </div>
+          <div className="text-center">
+            <div className="w-16 h-1 bg-gradient-to-r from-teal-500 to-green-500 rounded-full mx-auto mb-2"></div>
+            <span className="text-sm text-gray-400">Platform optimization</span>
+          </div>
+        </div>
+        
+        {/* Decorative elements */}
+        <div className="absolute -z-10 -bottom-20 -left-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute -z-10 -top-20 -right-20 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl"></div>
+      </div>
+    </div>
+  </div>
+</section>
 
         {/* Brands Section */}
         <section className="py-12">

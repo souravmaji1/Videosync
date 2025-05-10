@@ -20,46 +20,25 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-     - name: Render Video with Remotion
-  env:
-    VIDEO_URLS: ${{ toJson(github.event.client_payload.videoUrls) }}
-    AUDIO_URL: ${{ github.event.client_payload.audioUrl }}
-    IMAGES: ${{ toJson(github.event.client_payload.images) }}
-    DURATION: ${{ github.event.client_payload.duration }}
-    IMAGE_DURATION: ${{ github.event.client_payload.imageDuration }}
-    SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
-    SUBTITLE_STYLE: ${{ github.event.client_payload.styleType }}
-    AUDIO_VOLUME: ${{ github.event.client_payload.audioVolume }}
-  run: |
-    echo "Rendering video with props:"
-    echo "Video URLs: $VIDEO_URLS"
-    echo "Audio URL: $AUDIO_URL"
-    echo "Duration: $DURATION"
-    echo "Audio Volume: $AUDIO_VOLUME"
-
-    # Create a JSON file for props
-    node -e "
-      const fs = require('fs');
-      const props = {
-        videoUrls: JSON.parse(process.env.VIDEO_URLS || '[]'),
-        audioUrl: process.env.AUDIO_URL || '',
-        audioVolume: process.env.AUDIO_VOLUME ? parseFloat(process.env.AUDIO_VOLUME) : 1,
-        images: JSON.parse(process.env.IMAGES || '[]'),
-        subtitles: JSON.parse(process.env.SUBTITLES || '[]'),
-        styleType: process.env.SUBTITLE_STYLE || 'none',
-        duration: parseFloat(process.env.DURATION || 0),
-        imageDuration: process.env.IMAGE_DURATION ? parseFloat(process.env.IMAGE_DURATION) : 3
-      };
-      fs.writeFileSync('props.json', JSON.stringify(props, null, 2));
-    "
-
-    # Debug: Print props.json
-    cat props.json
-
-    # Run Remotion render with the JSON file
-    npx remotion render VideoWithSubtitles \
-      --props=props.json \
-      --output=rendered-video.mp4
+      - name: Render Video with Remotion
+        env:
+          VIDEO_URLS: ${{ toJson(github.event.client_payload.videoUrls) }}
+          AUDIO_URL: ${{ github.event.client_payload.audioUrl }}
+          IMAGES: ${{ toJson(github.event.client_payload.images) }}
+          DURATION: ${{ github.event.client_payload.duration }}
+          IMAGE_DURATION: ${{ github.event.client_payload.imageDuration }}
+          SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
+          SUBTITLE_STYLE: ${{ github.event.client_payload.styleType }}
+          AUDIO_VOLUME: ${{ github.event.client_payload.audioVolume }}
+        run: |
+          echo "Rendering video with props:"
+          echo "Video URLs: $VIDEO_URLS"
+          echo "Audio URL: $AUDIO_URL"
+          echo "Duration: $DURATION"
+          echo "Audio Volume: $AUDIO_VOLUME"
+          npx remotion render VideoWithSubtitles \
+            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"audioVolume\": $AUDIO_VOLUME, \"images\": $IMAGES, \"subtitles\": $SUBTITLES, \"styleType\": \"$SUBTITLE_STYLE\", \"duration\": $DURATION, \"imageDuration\": $IMAGE_DURATION}" \
+            --output="rendered-video.mp4"
 
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4

@@ -75,13 +75,16 @@ export const VideoComposition = ({
 };
 
 export const RemotionComposition = () => {
+  const fps = 30;
+  const defaultDuration = 30; // Fallback duration in seconds
+
   return (
     <>
       <Composition
         id="VideoWithSubtitles"
         component={VideoComposition}
-        durationInFrames={30 * 30} // Default 30 seconds
-        fps={30}
+        durationInFrames={(props) => Math.ceil((props.duration || defaultDuration) * fps)} // Dynamic duration based on prop
+        fps={fps}
         width={606}
         height={1080}
         defaultProps={{
@@ -89,7 +92,7 @@ export const RemotionComposition = () => {
           images: [],
           subtitles: [],
           styleType: 'none',
-          duration: 30,
+          duration: defaultDuration,
           imageDuration: 3,
           audioUrl: '',
           audioVolume: 1
@@ -98,6 +101,5 @@ export const RemotionComposition = () => {
     </>
   );
 };
-
 
 

@@ -100,23 +100,104 @@ export const RemotionComposition = (props) => {
   // Log the entire props object to see what's coming in
   console.log('Raw props received:', props);
   
-  // Extract duration with fallback for safety
+  // Extract duration with precise parsing
   const rawDuration = props.duration;
-  const duration = Number(rawDuration) || 20; // Default to 20 seconds if missing
+  
+  // Precise duration parsing
+  const duration = (() => {
+    // Convert to number and round to nearest whole number
+    const numDuration = Number(rawDuration);
+    
+    // Handle various edge cases
+    if (!Number.isFinite(numDuration) || numDuration <= 0) {
+      console.warn('Invalid duration:', rawDuration, 'using default 20 seconds');
+      return 20;
+    }
+    
+    // Round to nearest whole number, minimum 1 second
+    return Math.max(1, Math.round(numDuration));
+  })();
   
   // Log props for debugging
-  console.log('RemotionComposition props before processing:', {
+  console.log('RemotionComposition props processing:', {
     rawDuration,
-    duration,
+    processedDuration: duration,
     durationType: typeof rawDuration,
   });
   
-  // Safety check but don't throw error, use fallback
-  if (isNaN(duration) || duration <= 0) {
-    console.warn('Invalid duration:', rawDuration, 'using default 20 seconds');
-  }
-  
   const durationInFrames = Math.ceil(duration * fps);
+  
+  console.log('Final composition settings:', {
+    duration,
+    durationInFrames,
+    fps,
+  });
+
+  // Extract all other props
+  const {
+    videoUrls = [],
+    audioUrl = '',
+    audioVolume = 1,
+    images = [],
+    subtitles = [],
+    styleType = 'none',
+    imageDuration = 3,
+  } = props;
+
+  return (
+    <Composition
+      id="VideoWithSubtitles"
+      component={VideoComposition}
+      durationInFrames={durationInFrames}
+      fps={fps}
+      width={606}
+      height={1080}
+      defaultProps={{
+        videoUrls: Array.isArray(videoUrls) ? videoUrls : [],
+        images: Array.isArray(images) ? images : [],
+        subtitles: Array.isArray(subtitles) ? subtitles : [],
+        styleType: styleType || 'none',
+        duration: duration,
+        imageDuration: Number(imageDuration) || 3,
+        audioUrl: audioUrl || '',
+        audioVolume: Number(audioVolume) || 1,
+      }}
+    />
+  );
+};
+
+  // Extract all other props
+  const {
+    videoUrls = [],
+    audioUrl = '',
+    audioVolume = 1,
+    images = [],
+    subtitles = [],
+    styleType = 'none',
+    imageDuration = 3,
+  } = props;
+
+  return (
+    <Composition
+      id="VideoWithSubtitles"
+      component={VideoComposition}
+      durationInFrames={durationInFrames}
+      fps={fps}
+      width={606}
+      height={1080}
+      defaultProps={{
+        videoUrls: Array.isArray(videoUrls) ? videoUrls : [],
+        images: Array.isArray(images) ? images : [],
+        subtitles: Array.isArray(subtitles) ? subtitles : [],
+        styleType: styleType || 'none',
+        duration: roundedDuration,
+        imageDuration: Number(imageDuration) || 3,
+        audioUrl: audioUrl || '',
+        audioVolume: Number(audioVolume) || 1,
+      }}
+    />
+  );
+};
   
   console.log('Final composition settings:', {
     duration,

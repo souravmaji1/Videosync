@@ -29,9 +29,6 @@ export const VideoComposition = ({
     fps,
   });
 
-  // Validate duration
-  const safeDuration = Number(duration) || 30; // Fallback to 30 seconds
-
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
       {/* Audio */}
@@ -40,7 +37,7 @@ export const VideoComposition = ({
           src={audioUrl}
           volume={audioVolume}
           startFrom={0}
-          endAt={Math.ceil(safeDuration * fps)}
+          endAt={Math.ceil(duration * fps)}
           onError={(e) => console.error('Audio load error:', e)}
         />
       )}
@@ -52,7 +49,7 @@ export const VideoComposition = ({
             <Sequence
               key={index}
               from={Math.floor((video.start || 0) * fps)}
-              durationInFrames={Math.floor(((video.end || safeDuration) - (video.start || 0)) * fps)}
+              durationInFrames={Math.floor(((video.end || duration) - (video.start || 0)) * fps)}
             >
               <RemotionVideo
                 src={video.src || video}
@@ -97,39 +94,46 @@ export const VideoComposition = ({
 };
 
 // RemotionComposition component for composition setup
-export const RemotionComposition = ({
-  videoUrls,
-  audioUrl,
-  audioVolume,
-  images,
-  subtitles,
-  styleType,
-  duration,
-  imageDuration,
-}) => {
+export const RemotionComposition = (props) => {
   const fps = 30; // Define fps before usage
-  const safeDuration = Number(duration) || 30; // Fallback to 30 seconds
-  const durationInFrames = Math.ceil(safeDuration * fps);
-
+  
+  // Log the entire props object to see what's coming in
+  console.log('Raw props received:', props);
+  
+  // Extract duration with fallback for safety
+  const rawDuration = props.duration;
+  const duration = Number(rawDuration) || 20; // Default to 20 seconds if missing
+  
   // Log props for debugging
-  console.log('RemotionComposition props:', {
-    videoUrls,
-    audioUrl,
-    audioVolume,
-    images,
-    subtitles,
-    styleType,
+  console.log('RemotionComposition props before processing:', {
+    rawDuration,
     duration,
-    safeDuration,
+    durationType: typeof rawDuration,
+  });
+  
+  // Safety check but don't throw error, use fallback
+  if (isNaN(duration) || duration <= 0) {
+    console.warn('Invalid duration:', rawDuration, 'using default 20 seconds');
+  }
+  
+  const durationInFrames = Math.ceil(duration * fps);
+  
+  console.log('Final composition settings:', {
+    duration,
     durationInFrames,
-    durationType: typeof duration,
+    fps,
   });
 
-  // Validate durationInFrames
-  if (isNaN(durationInFrames) || durationInFrames <= 0) {
-    console.error('Invalid durationInFrames:', durationInFrames);
-    throw new Error('Duration must be a positive number');
-  }
+  // Extract all other props
+  const {
+    videoUrls = [],
+    audioUrl = '',
+    audioVolume = 1,
+    images = [],
+    subtitles = [],
+    styleType = 'none',
+    imageDuration = 3,
+  } = props;
 
   return (
     <Composition
@@ -144,7 +148,7 @@ export const RemotionComposition = ({
         images: Array.isArray(images) ? images : [],
         subtitles: Array.isArray(subtitles) ? subtitles : [],
         styleType: styleType || 'none',
-        duration: safeDuration,
+        duration: duration,
         imageDuration: Number(imageDuration) || 3,
         audioUrl: audioUrl || '',
         audioVolume: Number(audioVolume) || 1,
@@ -152,4 +156,3 @@ export const RemotionComposition = ({
     />
   );
 };
-

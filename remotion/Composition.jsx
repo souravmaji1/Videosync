@@ -1,5 +1,6 @@
 // src/remotion/Composition.jsx
 
+import React from 'react';
 import { Composition, AbsoluteFill, useVideoConfig, Video as RemotionVideo, Img, Sequence, Audio } from 'remotion';
 import SubtitleOverlay from '../components/SubtitleOverlay';
 
@@ -16,13 +17,16 @@ export const VideoComposition = ({
 }) => {
   const { fps } = useVideoConfig();
 
+  // Ensure duration is a number with a minimum of 1
+  const safeDuration = Math.max(1, Number(duration) || 6);
+
   // Log props for debugging
   console.log('VideoComposition props:', {
     videoUrls,
     images,
     subtitles,
     styleType,
-    duration,
+    duration: safeDuration,
     imageDuration,
     audioUrl,
     audioVolume,
@@ -37,7 +41,7 @@ export const VideoComposition = ({
           src={audioUrl}
           volume={audioVolume}
           startFrom={0}
-          endAt={Math.ceil(duration * fps)}
+          endAt={Math.ceil(safeDuration * fps)}
           onError={(e) => console.error('Audio load error:', e)}
         />
       )}
@@ -49,7 +53,7 @@ export const VideoComposition = ({
             <Sequence
               key={index}
               from={Math.floor((video.start || 0) * fps)}
-              durationInFrames={Math.floor(((video.end || duration) - (video.start || 0)) * fps)}
+              durationInFrames={Math.floor(((video.end || safeDuration) - (video.start || 0)) * fps)}
             >
               <RemotionVideo
                 src={video.src || video}
@@ -100,23 +104,15 @@ export const RemotionComposition = (props) => {
   // Log the entire props object to see what's coming in
   console.log('Raw props received:', props);
   
-  // Extract duration with precise parsing
-  const rawDuration = props.duration;
+  // Precise duration handling
+  const rawDuration = props.duration || props.audioUrl ? 
+    (Number(props.duration) || 
+     (props.audioUrl && Number(props.audioUrl.split('_').pop().split('.')[0]) / 1000) || 
+     6) : 
+    6;
   
-  // Precise duration parsing
-  const duration = (() => {
-    // Convert to number and round to nearest whole number
-    const numDuration = Number(rawDuration);
-    
-    // Handle various edge cases
-    if (!Number.isFinite(numDuration) || numDuration <= 0) {
-      console.warn('Invalid duration:', rawDuration, 'using default 20 seconds');
-      return 20;
-    }
-    
-    // Round to nearest whole number, minimum 1 second
-    return Math.max(1, Math.round(numDuration));
-  })();
+  // Round to nearest whole number, minimum 1 second
+  const duration = Math.max(1, Math.round(rawDuration));
   
   // Log props for debugging
   console.log('RemotionComposition props processing:', {
@@ -133,79 +129,7 @@ export const RemotionComposition = (props) => {
     fps,
   });
 
-  // Extract all other props
-  const {
-    videoUrls = [],
-    audioUrl = '',
-    audioVolume = 1,
-    images = [],
-    subtitles = [],
-    styleType = 'none',
-    imageDuration = 3,
-  } = props;
-
-  return (
-    <Composition
-      id="VideoWithSubtitles"
-      component={VideoComposition}
-      durationInFrames={durationInFrames}
-      fps={fps}
-      width={606}
-      height={1080}
-      defaultProps={{
-        videoUrls: Array.isArray(videoUrls) ? videoUrls : [],
-        images: Array.isArray(images) ? images : [],
-        subtitles: Array.isArray(subtitles) ? subtitles : [],
-        styleType: styleType || 'none',
-        duration: duration,
-        imageDuration: Number(imageDuration) || 3,
-        audioUrl: audioUrl || '',
-        audioVolume: Number(audioVolume) || 1,
-      }}
-    />
-  );
-};
-
-  // Extract all other props
-  const {
-    videoUrls = [],
-    audioUrl = '',
-    audioVolume = 1,
-    images = [],
-    subtitles = [],
-    styleType = 'none',
-    imageDuration = 3,
-  } = props;
-
-  return (
-    <Composition
-      id="VideoWithSubtitles"
-      component={VideoComposition}
-      durationInFrames={durationInFrames}
-      fps={fps}
-      width={606}
-      height={1080}
-      defaultProps={{
-        videoUrls: Array.isArray(videoUrls) ? videoUrls : [],
-        images: Array.isArray(images) ? images : [],
-        subtitles: Array.isArray(subtitles) ? subtitles : [],
-        styleType: styleType || 'none',
-        duration: roundedDuration,
-        imageDuration: Number(imageDuration) || 3,
-        audioUrl: audioUrl || '',
-        audioVolume: Number(audioVolume) || 1,
-      }}
-    />
-  );
-};
-  
-  console.log('Final composition settings:', {
-    duration,
-    durationInFrames,
-    fps,
-  });
-
-  // Extract all other props
+  // Extract all other props with robust defaults
   const {
     videoUrls = [],
     audioUrl = '',

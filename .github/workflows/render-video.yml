@@ -36,8 +36,20 @@ jobs:
           echo "Audio URL: $AUDIO_URL"
           echo "Duration: $DURATION"
           echo "Audio Volume: $AUDIO_VOLUME"
+          echo "Images: $IMAGES"
+          echo "Subtitles: $SUBTITLES"
+          echo "Subtitle Style: $SUBTITLE_STYLE"
+          
+          # Build props JSON conditionally
+          PROPS="{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"audioVolume\": $AUDIO_VOLUME, \"images\": $IMAGES, \"subtitles\": $SUBTILES, \"styleType\": \"$SUBTITLE_STYLE\", \"duration\": $DURATION}"
+          
+          # Only include imageDuration if it exists
+          if [ ! -z "$IMAGE_DURATION" ]; then
+            PROPS=$(echo $PROPS | jq ". + {\"imageDuration\": $IMAGE_DURATION}")
+          fi
+          
           npx remotion render VideoWithSubtitles \
-            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"audioVolume\": $AUDIO_VOLUME, \"images\": $IMAGES, \"subtitles\": $SUBTITLES, \"styleType\": \"$SUBTITLE_STYLE\", \"duration\": $DURATION, \"imageDuration\": $IMAGE_DURATION}" \
+            --props="$PROPS" \
             --output="rendered-video.mp4"
 
       - name: Upload Rendered Video as Artifact

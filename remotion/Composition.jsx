@@ -10,14 +10,15 @@ export const VideoComposition = ({
   subtitles,
   styleType,
   duration,
-  imageDuration = 3, // Default 3 seconds per image
+  imageDuration = 3,
   audioUrl,
-  audioVolume = 1, // Default volume
+  audioVolume = 1,
+  uniqueId,
 }) => {
   const { fps } = useVideoConfig();
 
-  // Log props for debugging
-  console.log('VideoComposition props:', {
+  console.log('Rendering VideoComposition:', {
+    uniqueId,
     videoUrls,
     images,
     subtitles,
@@ -28,7 +29,6 @@ export const VideoComposition = ({
     audioVolume,
     fps,
   });
-
   // Validate duration
   const safeDuration = Number(duration) || 30; // Fallback to 30 seconds
 
@@ -106,13 +106,14 @@ export const RemotionComposition = ({
   styleType,
   duration,
   imageDuration,
+  uniqueId,
 }) => {
-  const fps = 30; // Define fps before usage
-  const safeDuration = Number(duration) || 30; // Fallback to 30 seconds
+  const fps = 30;
+  const safeDuration = Number(duration) || 30;
   const durationInFrames = Math.ceil(safeDuration * fps);
 
-  // Log props for debugging
   console.log('RemotionComposition props:', {
+    uniqueId,
     videoUrls,
     audioUrl,
     audioVolume,
@@ -122,14 +123,7 @@ export const RemotionComposition = ({
     duration,
     safeDuration,
     durationInFrames,
-    durationType: typeof duration,
   });
-
-  // Validate durationInFrames
-  if (isNaN(durationInFrames) || durationInFrames <= 0) {
-    console.error('Invalid durationInFrames:', durationInFrames);
-    throw new Error('Duration must be a positive number');
-  }
 
   return (
     <Composition
@@ -148,6 +142,7 @@ export const RemotionComposition = ({
         imageDuration: Number(imageDuration) || 3,
         audioUrl: audioUrl || '',
         audioVolume: Number(audioVolume) || 1,
+        uniqueId,
       }}
     />
   );

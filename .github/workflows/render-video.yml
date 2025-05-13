@@ -20,6 +20,9 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Render Video with Remotion
         env:
           VIDEO_URLS: ${{ toJson(github.event.client_payload.videoUrls) }}
@@ -36,8 +39,38 @@ jobs:
           echo "Audio URL: $AUDIO_URL"
           echo "Duration: $DURATION"
           echo "Audio Volume: $AUDIO_VOLUME"
+          echo "Images: $IMAGES"
+          echo "Subtitles: $SUBTITLES"
+          echo "Subtitle Style: $SUBTITLE_STYLE"
+
+          # Build props JSON
+          PROPS=$(jq -n \
+            --argjson videoUrls "$VIDEO_URLS" \
+            --arg audioUrl "$AUDIO_URL" \
+            --argjson audioVolume "$AUDIO_VOLUME" \
+            --argjson images "$IMAGES" \
+            --argjson subtitles "$SUBTITLES" \
+            --arg styleType "$SUBTITLE_STYLE" \
+            --argjson duration "$DURATION" \
+            '{
+              videoUrls: $videoUrls,
+              audioUrl: $audioUrl,
+              audioVolume: $audioVolume,
+              images: $images,
+              subtitles: $subtitles,
+              styleType: $styleType,
+              duration: $duration
+            }')
+
+          # Only include imageDuration if it exists
+          if [ ! -z "$IMAGE_DURATION" ]; then
+            PROPS=$(echo $PROPS | jq --argjson imageDuration "$IMAGE_DURATION" '. + {imageDuration: $imageDuration}')
+          fi
+
+          echo "Constructed PROPS: $PROPS"
+
           npx remotion render VideoWithSubtitles \
-            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"audioVolume\": $AUDIO_VOLUME, \"images\": $IMAGES, \"subtitles\": $SUBTITLES, \"styleType\": \"$SUBTITLE_STYLE\", \"duration\": $DURATION, \"imageDuration\": $IMAGE_DURATION}" \
+            --props="$PROPS" \
             --output="rendered-video.mp4"
 
       - name: Upload Rendered Video as Artifact

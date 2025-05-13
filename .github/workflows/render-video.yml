@@ -33,8 +33,11 @@ jobs:
           SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
           SUBTITLE_STYLE: ${{ github.event.client_payload.styleType }}
           AUDIO_VOLUME: ${{ github.event.client_payload.audioVolume }}
+          OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
+          UNIQUE_ID: ${{ github.event.client_payload.uniqueId }}
         run: |
           echo "Rendering video with props:"
+          echo "Unique ID: $UNIQUE_ID"
           echo "Video URLs: $VIDEO_URLS"
           echo "Audio URL: $AUDIO_URL"
           echo "Duration: $DURATION"
@@ -42,6 +45,7 @@ jobs:
           echo "Images: $IMAGES"
           echo "Subtitles: $SUBTITLES"
           echo "Subtitle Style: $SUBTITLE_STYLE"
+          echo "Output File: $OUTPUT_FILE"
 
           # Build props JSON
           PROPS=$(jq -n \
@@ -52,6 +56,7 @@ jobs:
             --argjson subtitles "$SUBTITLES" \
             --arg styleType "$SUBTITLE_STYLE" \
             --argjson duration "$DURATION" \
+            --arg uniqueId "$UNIQUE_ID" \
             '{
               videoUrls: $videoUrls,
               audioUrl: $audioUrl,
@@ -59,10 +64,10 @@ jobs:
               images: $images,
               subtitles: $subtitles,
               styleType: $styleType,
-              duration: $duration
+              duration: $duration,
+              uniqueId: $uniqueId
             }')
 
-          # Only include imageDuration if it exists
           if [ ! -z "$IMAGE_DURATION" ]; then
             PROPS=$(echo $PROPS | jq --argjson imageDuration "$IMAGE_DURATION" '. + {imageDuration: $imageDuration}')
           fi
@@ -71,11 +76,11 @@ jobs:
 
           npx remotion render VideoWithSubtitles \
             --props="$PROPS" \
-            --output="rendered-video.mp4"
+            --output="$OUTPUT_FILE"
 
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rendered-video
-          path: "*.mp4"
+          name: rendered-video-${{ github.event.client_payload.uniqueId }}
+          path: "${{ github.event.client_payload.outputFile }}"
           retention-days: 7

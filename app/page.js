@@ -67,15 +67,16 @@ export default function Home() {
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveReel((prev) => (prev + 1) % videoReels.length);
+      console.log(activeReel)
     }, 5000);
     
     return () => clearInterval(interval);
   }, []);
 
   // Manual selection of reels
-  const selectReel = (index) => {
-    setActiveReel(index);
-  };
+ // const selectReel = (index) => {
+  //  setActiveReel(index);
+ // };
 
   // Auto-rotate through reels
   useEffect(() => {
@@ -92,6 +93,7 @@ export default function Home() {
         setScrolled(true);
       } else {
         setScrolled(false);
+        console.log(scrolled)
       }
 
       // Trigger stats animation when scrolled to that section
@@ -146,21 +148,21 @@ export default function Home() {
         title: "Neural Clip Detection",
         description: "Our advanced AI identifies the most engaging moments from your videos using attention mapping technology that predicts viewer engagement.",
         icon: <Sparkles className="text-purple-400" size={24} />,
-        image: "/john.webp",
+        image: "/clip.png",
         color: "from-purple-900 to-indigo-900"
       },
       {
         title: "Dynamic Captions",
         description: "Eye-catching animated captions with custom styles that follow your speech perfectly and automatically adapt to each platform's requirements.",
         icon: <MessageCircle className="text-blue-400" size={24} />,
-        image: "/kl.webp",
+        image: "/subtitle.png",
         color: "from-blue-900 to-cyan-900"
       },
       {
         title: "Intelligent Framing",
         description: "Smart reframing that keeps important subjects centered regardless of aspect ratio, ensuring your content looks perfect everywhere.",
         icon: <Smartphone className="text-teal-400" size={24} />,
-        image: "/jf.webp",
+        image: "/frame.png",
         color: "from-teal-900 to-emerald-900"
       }
     ],
@@ -247,21 +249,21 @@ export default function Home() {
       quote: "VideoSync transformed my content strategy. I create once and reach my audience everywhere with perfectly optimized videos.",
       author: "Alex Morgan",
       role: "Tech Influencer • 3M+ Followers",
-      image: "/api/placeholder/64/64",
+      image: "/john.webp",
       platforms: ["TikTok", "YouTube", "Instagram"]
     },
     {
       quote: "Our agency used to spend days reformatting client videos. Now it's automated, and we deliver 3x the content in half the time.",
       author: "Sarah Chen",
       role: "Digital Marketing Director",
-      image: "/api/placeholder/64/64",
+      image: "/kl.webp",
       platforms: ["Facebook", "LinkedIn", "Twitter"]
     },
     {
       quote: "The AI caption feature alone saved my team countless hours, and the engagement analytics helped us grow 400% in six months.",
       author: "Marcus Johnson",
       role: "Content Creator • 1.5M Subscribers",
-      image: "/api/placeholder/64/64",
+      image: "/h.png",
       platforms: ["YouTube", "Instagram", "TikTok"]
     }
   ];
@@ -323,7 +325,7 @@ export default function Home() {
   return (
     <div className="bg-gray-950 text-white min-h-screen">
       {/* Header */}
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-gray-950/95 backdrop-blur-md border-b border-gray-800' : 'bg-transparent'}`}>
+<header className={`fixed top-0 left-0 right-0 z-50 isolate `}>
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center">
             <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">VideoSync</div>
@@ -598,7 +600,7 @@ export default function Home() {
                 <div className="relative bg-gray-900 rounded-2xl p-2 shadow-2xl backdrop-blur-sm border border-gray-800">
                   <div className="overflow-hidden rounded-xl">
                     <img 
-                      src="/ghibli.jpg" 
+                      src="/photo.png" 
                       alt="Upload Video" 
                       className="w-full h-auto transform transition duration-700 group-hover:scale-110" 
                     />
@@ -696,7 +698,7 @@ export default function Home() {
                 <div className="relative bg-gray-900 rounded-2xl p-2 shadow-2xl backdrop-blur-sm border border-gray-800">
                   <div className="overflow-hidden rounded-xl relative">
                     <img 
-                      src="/kl.webp" 
+                      src="/ai.png" 
                       alt="AI Processing" 
                       className="w-full h-auto transform transition duration-700 group-hover:scale-110" 
                     />
@@ -741,7 +743,7 @@ export default function Home() {
                 <div className="relative bg-gray-900 rounded-2xl p-2 shadow-2xl backdrop-blur-sm border border-gray-800">
                   <div className="overflow-hidden rounded-xl relative">
                     <img 
-                      src="/john.webp" 
+                      src="/social.png" 
                       alt="Publish Everywhere" 
                       className="w-full h-auto transform transition duration-700 group-hover:scale-110" 
                     />

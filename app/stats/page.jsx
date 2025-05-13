@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
 import {
-  Video, Home, Settings, Star, ChevronRight, HelpCircle, Plus, Upload as UploadIcon, AlertCircle, X,
-  Eye, ThumbsUp, MessageSquare, Clock, PlayCircle, TrendingUp, Calendar, ArrowUpRight, BookOpen,Music, Users, Sparkles, Zap
+  Video, Home, Settings,  ChevronRight, HelpCircle, Plus, Upload as UploadIcon, AlertCircle, X, ChevronDown,
+  Eye, ThumbsUp, MessageSquare, Clock, PlayCircle, TrendingUp, Calendar, ArrowUpRight, BookOpen,BarChart2 as Music, Users, Sparkles, Zap
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -713,7 +713,7 @@ export default function YouTubeStats() {
                     </div>
                     <h2 className="text-2xl font-bold mt-6 mb-3">No YouTube Videos</h2>
                     <p className="text-gray-400 max-w-md mx-auto mb-8">
-                      You haven't uploaded any videos to YouTube yet. Upload videos to start tracking their performance.
+                      You havent uploaded any videos to YouTube yet. Upload videos to start tracking their performance.
                     </p>
                     <Link href="/video-upload">
                       <Button className="py-2.5 px-5 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium rounded-xl shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 transition-all">

@@ -12,7 +12,7 @@ import {
   ChevronDown,
   Video,
 BookOpen,
-Music,
+BarChart2 as Music,
 Users,
   Sparkles,
   Zap,

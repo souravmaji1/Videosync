@@ -1,4 +1,5 @@
-import JSZip from 'jszip';
+// /api/bulkrender.js
+
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -17,7 +18,7 @@ export async function POST(request) {
     }
 
     const validStyles = ['none', 'hormozi', 'abdaal', 'neonGlow', 'retroWave', 'minimalPop'];
-    const githubToken = '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';
+    const githubToken = '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';
     const repoOwner = 'souravmaji1';
     const repoName = 'Videosync';
     const workflowIds = [];
@@ -25,13 +26,18 @@ export async function POST(request) {
     for (const segment of segments) {
       const { videoUrls, images, subtitles, styleType, audioUrl, duration, imageDuration, title, description } = segment;
 
-      if (!videoUrls || !duration ) {
-        console.warn(`Invalid segment data at index :`, { videoUrls, duration });
+      if (!videoUrls && (!images || !Array.isArray(images) || images.length === 0)) {
+        console.warn(`Invalid segment data: videoUrls or images required`, { videoUrls, images });
+        continue;
+      }
+
+      if (!duration) {
+        console.warn(`Invalid duration for segment:`, { duration });
         continue;
       }
 
       if (!validStyles.includes(styleType)) {
-        console.warn(`Invalid styleType for segment : ${styleType}`);
+        console.warn(`Invalid styleType for segment: ${styleType}`);
         continue;
       }
 
@@ -40,15 +46,20 @@ export async function POST(request) {
       }
 
       const props = {
-        videoUrls,
+        videoUrls: videoUrls || [],
         subtitles: subtitles && Array.isArray(subtitles) ? subtitles : [],
         styleType,
-        images,
-        imageDuration,
-        audioUrl,
+        images: images || [],
+        audioUrl: audioUrl || '',
+        audioVolume: 1,
         duration,
-        outputFile: `rendered_${styleType}_${Date.now()}.mp4`
+        outputFile: `rendered_${styleType}_${Date.now()}.mp4`,
       };
+   console.log(props)
+      // Only include imageDuration if images are provided
+      if (images && Array.isArray(images) && images.length > 0) {
+        props.imageDuration = Number(imageDuration) || 3;
+      }
 
       // Trigger GitHub Actions workflow
       const dispatchResponse = await fetch(
@@ -58,18 +69,18 @@ export async function POST(request) {
           headers: {
             Authorization: `Bearer ${githubToken}`,
             Accept: 'application/vnd.github.v3+json',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             event_type: 'render-video',
-            client_payload: props
-          })
+            client_payload: props,
+          }),
         }
       );
 
       if (!dispatchResponse.ok) {
         const errorData = await dispatchResponse.json();
-        console.error(`Failed to trigger workflow for segment :`, errorData);
+        console.error(`Failed to trigger workflow for segment:`, errorData);
         continue;
       }
 
@@ -84,40 +95,39 @@ export async function POST(request) {
           {
             headers: {
               Authorization: `Bearer ${githubToken}`,
-              Accept: 'application/vnd.github.v3+json'
-            }
+              Accept: 'application/vnd.github.v3+json',
+            },
           }
         );
 
         if (!runsResponse.ok) {
-          console.error(`Failed to fetch workflow runs for segment `);
+          console.error(`Failed to fetch workflow runs for segment`);
           break;
         }
 
         const runsData = await runsResponse.json();
         const recentRun = runsData.workflow_runs.find(
-          run => run.event === 'repository_dispatch' && run.status !== 'completed'
+          (run) => run.event === 'repository_dispatch' && run.status !== 'completed'
         );
 
         if (recentRun) {
           workflowRunId = recentRun.id;
-          console.log(`Workflow triggered for segment , run ID:`, workflowRunId);
+          console.log(`Workflow triggered for segment, run ID:`, workflowRunId);
 
           // Store workflow ID in Supabase
-          const inserts = segments.map((segment, index) => ({
-  user_id: userId,
-  workflow_id: workflowRunId,
-  segment_index: index,
-  status: 'queued',
-  created_at: new Date().toISOString(),
-  output_file: props.outputFile,
-  title: segment.title || '',
-  description: segment.description || ''
-}));
-const { error } = await supabase.from('render_workflows').insert(inserts);
+          const { error } = await supabase.from('render_workflows').insert({
+            user_id: userId,
+            workflow_id: workflowRunId,
+            segment_index: segment.segmentIndex || 0,
+            status: 'queued',
+            created_at: new Date().toISOString(),
+            output_file: props.outputFile,
+            title: title || '',
+            description: description || '',
+          });
 
-          if (insertError) {
-            console.error(`Failed to store workflow ID for segment :`, insertError);
+          if (error) {
+            console.error(`Failed to store workflow ID for segment:`, error);
             continue;
           }
 
@@ -125,12 +135,12 @@ const { error } = await supabase.from('render_workflows').insert(inserts);
           break;
         }
 
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         attempts++;
       }
 
       if (!workflowRunId) {
-        console.warn(`Workflow not triggered within timeout for segment `);
+        console.warn(`Workflow not triggered within timeout for segment`);
       }
     }
 

@@ -1,13 +1,29 @@
 {
-  "audioUrl": "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/user_2vJ7zMGd8wt97m26vnldmkts30s/1746684700549_dua.mp3",
-  "audioVolume": 0.5,
   "images": [
-    "https://images.pexels.com/photos/2486168/pexels-photo-2486168.jpeg",
-    "https://images.pexels.com/photos/1629236/pexels-photo-1629236.jpeg",
-    "https://images.pexels.com/photos/36717/amazing-animal-beautiful-beautifull.jpg"
+    "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars//A_futuristic_spaceship_flying_through_a_vibrant_co.jpeg",
+    "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars//1742817076892_11487180.jpg", 
+    "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars//A_dark_and_eerie_forest_scene_at_night_with_a_mena%20(2).jpeg"
   ],
-  "subtitles": [],
-  "styleType": "none",
-  "duration": 30,
+  "audioUrl": "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars//audio-1745220186795.wav",
+  "audioVolume": 0.5,
+  "subtitles": [
+    {
+      "text": "Welcome to Our Slideshow",
+      "start": 0,
+      "end": 3
+    },
+    {
+      "text": "Exploring Beautiful Moments",
+      "start": 3,
+      "end": 6
+    },
+    {
+      "text": "Memories That Last Forever",
+      "start": 6,
+      "end": 9
+    }
+  ],
+  "styleType": "bottom-overlay",
+  "duration": 21.2,
   "imageDuration": 3
 }

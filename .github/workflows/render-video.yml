@@ -24,10 +24,10 @@ jobs:
         env:
           VIDEO_URLS: ${{ toJson(github.event.client_payload.videoUrls) }}
           AUDIO_URL: ${{ github.event.client_payload.audioUrl }}
-          IMAGES: ${{ github.event.client_payload.images }}
+          IMAGES: ${{ toJson(github.event.client_payload.images) }}
           DURATION: ${{ github.event.client_payload.duration }}
           IMAGE_DURATION: ${{ github.event.client_payload.imageDuration }}
-          SUBTITLES: ${{ github.event.client_payload.subtitles }}
+          SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
           SUBTITLE_STYLE: ${{ github.event.client_payload.styleType }}
           AUDIO_VOLUME: ${{ github.event.client_payload.audioVolume }}
         run: |
@@ -36,11 +36,10 @@ jobs:
           echo "Audio URL: $AUDIO_URL"
           echo "Duration: $DURATION"
           echo "Audio Volume: $AUDIO_VOLUME"
-          echo "Output File: $OUTPUT_FILE"
           npx remotion render VideoWithSubtitles \
-            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\",  \"audioVolume\": $AUDIO_VOLUME}", \"images\": $IMAGES, \"subtitles\": $SUBTITLES, \"styleType\": $SUBTITLE_STYLE, \"duration\": $DURATION, \"imageDuration\": $IMAGE_DURATION, \
-            --output="$SUBTITLE_STYLE.mp4"
-          
+            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"audioVolume\": $AUDIO_VOLUME, \"images\": $IMAGES, \"subtitles\": $SUBTITLES, \"styleType\": \"$SUBTITLE_STYLE\", \"duration\": $DURATION, \"imageDuration\": $IMAGE_DURATION}" \
+            --output="rendered-video.mp4"
+
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4
         with:

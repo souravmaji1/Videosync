@@ -4,8 +4,8 @@ import { useUser } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
 import JSZip from 'jszip';
 import {
-  Video, Folder, ChevronRight, Home, Settings, X, HelpCircle, Plus, Sparkles, Play, Star, Zap,BarChart2,Cloud,
-  Download, Trash2, List, Grid, Search, ChevronDown, Upload as UploadIcon, UploadCloud as Youtube, AlertCircle, CheckCircle, BookOpen, Music, Users
+  Video, ChevronRight, Home, Settings, X, HelpCircle, Plus, Sparkles, Play, Star, Zap,
+  Download, Trash2, List, Grid, Search, ChevronDown, Upload as UploadIcon, UploadCloud as Youtube, AlertCircle, CheckCircle, BookOpen,BarChart2 as  Music, Users
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,7 @@ export default function VideoLibraryShort() {
   const [youtubeChannel, setYoutubeChannel] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const isAnimating = false;
   // Fetch videos, render workflows, and Google account from Supabase
   useEffect(() => {
     if (!user) return;
@@ -123,170 +123,170 @@ export default function VideoLibraryShort() {
     fetchYoutubeChannel();
   }, [googleAccount]);
 
-   // Animation effect on mount
-    useEffect(() => {
-      setIsAnimating(true);
-      const timer = setTimeout(() => setIsAnimating(false), 1000);
-      return () => clearTimeout(timer);
-    }, []);
+  
+useEffect(() => {
+  if (!renderWorkflows.length) return;
 
-  // Poll GitHub workflow status for in-progress workflows
-  useEffect(() => {
-    if (!renderWorkflows.length) return;
+  const githubToken = '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';
+  const repoOwner = 'souravmaji1';
+  const repoName = 'Videosync';
 
-    const githubToken = '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';
-    const repoOwner = 'souravmaji1';
-    const repoName = 'Videosync';
+  const pollWorkflows = async () => {
+    const updatedWorkflows = [...renderWorkflows];
+    
 
-    const pollWorkflows = async () => {
-      const updatedWorkflows = [...renderWorkflows];
+    for (let i = 0; i < updatedWorkflows.length; i++) {
+      const workflow = updatedWorkflows[i];
+      if (workflow.status === 'completed' || workflow.status === 'failed') continue;
 
-      for (const workflow of updatedWorkflows) {
-        if (workflow.status === 'completed' || workflow.status === 'failed') continue;
+      console.log(`Polling workflow ${workflow.workflow_id}, current status: ${workflow.status}`);
 
-        try {
-          const response = await fetch(
-            `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflow.workflow_id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${githubToken}`,
-                Accept: 'application/vnd.github.v3+json'
-              }
+      try {
+        const response = await fetch(
+          `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflow.workflow_id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${githubToken}`,
+              Accept: 'application/vnd.github.v3+json'
             }
-          );
-
-          if (!response.ok) {
-            console.error(`Failed to fetch workflow ${workflow.workflow_id} status: ${response.statusText}`);
-            continue;
           }
+        );
 
-          const runData = await response.json();
-          let newStatus = runData.status === 'completed' ? (runData.conclusion === 'success' ? 'completed' : 'failed') : runData.status;
+        if (!response.ok) {
+          console.error(`Failed to fetch workflow ${workflow.workflow_id} status: ${response.statusText}`);
+          continue;
+        }
 
-          if (newStatus !== workflow.status) {
-            const updateData = { status: newStatus };
+        const runData = await response.json();
+        let newStatus = runData.status === 'completed' ? (runData.conclusion === 'success' ? 'completed' : 'failed') : runData.status;
 
-            if (newStatus === 'completed' && runData.conclusion === 'success') {
-              const artifactsResponse = await fetch(
-                `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflow.workflow_id}/artifacts`,
-                {
+        if (newStatus !== workflow.status) {
+          const updateData = { status: newStatus };
+
+          if (newStatus === 'completed' && runData.conclusion === 'success') {
+            const artifactsResponse = await fetch(
+              `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflow.workflow_id}/artifacts`,
+              {
+                headers: {
+                  Authorization: `Bearer ${githubToken}`,
+                  Accept: 'application/vnd.github.v3+json'
+                }
+              }
+            );
+
+            if (artifactsResponse.ok) {
+              const artifactsData = await artifactsResponse.json();
+              const videoArtifact = artifactsData.artifacts.find(artifact => artifact.name === 'rendered-video');
+
+              if (videoArtifact) {
+                const downloadResponse = await fetch(videoArtifact.archive_download_url, {
                   headers: {
                     Authorization: `Bearer ${githubToken}`,
                     Accept: 'application/vnd.github.v3+json'
                   }
-                }
-              );
+                });
 
-              if (artifactsResponse.ok) {
-                const artifactsData = await artifactsResponse.json();
-                const videoArtifact = artifactsData.artifacts.find(artifact => artifact.name === 'rendered-video');
+                if (downloadResponse.ok) {
+                  const artifactZip = await downloadResponse.arrayBuffer();
+                  const zip = new JSZip();
+                  const zipContent = await zip.loadAsync(artifactZip);
+                  const mp4File = Object.values(zipContent.files).find(file => file.name.endsWith('.mp4'));
 
-                if (videoArtifact) {
-                  const downloadResponse = await fetch(videoArtifact.archive_download_url, {
-                    headers: {
-                      Authorization: `Bearer ${githubToken}`,
-                      Accept: 'application/vnd.github.v3+json'
-                    }
-                  });
+                  if (!mp4File) {
+                    console.error(`No MP4 file found in artifact ZIP for workflow ${workflow.workflow_id}`);
+                    newStatus = 'failed';
+                  } else {
+                    const mp4Blob = await mp4File.async('blob');
+                    const fileName = `rendered_${workflow.segment_index}_${Date.now()}.mp4`;
 
-                  if (downloadResponse.ok) {
-                    const artifactZip = await downloadResponse.arrayBuffer();
-                    const zip = new JSZip();
-                    const zipContent = await zip.loadAsync(artifactZip);
-                    const mp4File = Object.values(zipContent.files).find(file => file.name.endsWith('.mp4'));
-
-                    if (!mp4File) {
-                      console.error(`No MP4 file found in artifact ZIP for workflow ${workflow.workflow_id}`);
+                    // Upload to Supabase storage
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                      .from('avatars')
+                      .upload(`rendered/${fileName}`, mp4Blob, {
+                        contentType: 'video/mp4'
+                      });
+                     console.log(uploadData)
+                    if (uploadError) {
+                      console.error(`Failed to upload rendered video for workflow ${workflow.workflow_id}:`, uploadError);
                       newStatus = 'failed';
                     } else {
-                      const mp4Blob = await mp4File.async('blob');
-                      const fileName = `rendered_${workflow.segment_index}_${Date.now()}.mp4`;
-
-                      // Upload to Supabase storage
-                      const { data: uploadData, error: uploadError } = await supabase.storage
+                      const { data: urlData } = supabase.storage
                         .from('avatars')
-                        .upload(`rendered/${fileName}`, mp4Blob, {
-                          contentType: 'video/mp4'
+                        .getPublicUrl(`rendered/${fileName}`);
+
+                      updateData.video_url = urlData.publicUrl;
+                      updateData.duration = workflow.duration;
+
+                      // Add to user_videos
+                      const videoName = `Rendered Segment ${workflow.segment_index + 1}`;
+                      const videoTitle = videoName;
+                      const videoDescription = `Segment ${workflow.segment_index + 1} rendered on ${new Date().toLocaleDateString()}`;
+                      const { error: videoInsertError } = await supabase
+                        .from('user_videos')
+                        .insert({
+                          user_id: user.id,
+                          video_url: urlData.publicUrl,
+                          title: videoName,
+                          description: videoDescription,
+                          created_at: new Date().toISOString(),
+                          duration: workflow.duration
                         });
 
-                      if (uploadError) {
-                        console.error(`Failed to upload rendered video for workflow ${workflow.workflow_id}:`, uploadError);
-                        newStatus = 'failed';
+                      if (videoInsertError) {
+                        console.error('Failed to insert video into user_videos:', videoInsertError);
                       } else {
-                        const { data: urlData } = supabase.storage
-                          .from('avatars')
-                          .getPublicUrl(`rendered/${fileName}`);
-
-                        updateData.video_url = urlData.publicUrl;
-                        updateData.duration = workflow.duration;
-
-                        // Add to user_videos with a guaranteed name
-                        const videoName = `Rendered Segment ${workflow.segment_index + 1}`;
-                        const videoTitle = videoName;
-                        const videoDescription = `Segment ${workflow.segment_index + 1} rendered on ${new Date().toLocaleDateString()}`;
-                        const { error: videoInsertError } = await supabase
-                          .from('user_videos')
-                          .insert({
-                            user_id: user.id,
-                            video_url: urlData.publicUrl,
-                            title: videoName,
-                            description: videoDescription,
-                            created_at: new Date().toISOString(),
-                            duration: workflow.duration
-                          });
-
-                        if (videoInsertError) {
-                          console.error('Failed to insert video into user_videos:', videoInsertError);
-                        } else {
-                          setVideos(prev => [{
-                            user_id: user.id,
-                            video_url: urlData.publicUrl,
-                            title: videoTitle,
-                            description: videoDescription,
-                            created_at: new Date().toISOString(),
-                            duration: workflow.duration
-                          }, ...prev]);
-                        }
+                        setVideos(prev => [{
+                          id: Date.now(), // Temporary ID; replace with actual ID if available
+                          user_id: user.id,
+                          video_url: urlData.publicUrl,
+                          title: videoTitle,
+                          description: videoDescription,
+                          created_at: new Date().toISOString(),
+                          duration: workflow.duration
+                        }, ...prev]);
                       }
                     }
-                  } else {
-                    console.error(`Failed to download artifact for workflow ${workflow.workflow_id}: ${downloadResponse.statusText}`);
-                    newStatus = 'failed';
                   }
                 } else {
-                  console.error(`No rendered-video artifact found for workflow ${workflow.workflow_id}`);
+                  console.error(`Failed to download artifact for workflow ${workflow.workflow_id}: ${downloadResponse.statusText}`);
                   newStatus = 'failed';
                 }
               } else {
-                console.error(`Failed to fetch artifacts for workflow ${workflow.workflow_id}: ${artifactsResponse.statusText}`);
+                console.error(`No rendered-video artifact found for workflow ${workflow.workflow_id}`);
                 newStatus = 'failed';
               }
-            }
-
-            // Update workflow status in Supabase
-            const { error: updateError } = await supabase
-              .from('render_workflows')
-              .update(updateData)
-              .eq('id', workflow.id);
-
-            if (updateError) {
-              console.error(`Failed to update workflow ${workflow.workflow_id} status:`, updateError);
             } else {
-              workflow.status = newStatus;
-              if (updateData.video_url) workflow.video_url = updateData.video_url;
+              console.error(`Failed to fetch artifacts for workflow ${workflow.workflow_id}: ${artifactsResponse.statusText}`);
+              newStatus = 'failed';
             }
           }
-        } catch (error) {
-          console.error(`Error polling workflow ${workflow.workflow_id}:`, error);
+
+          // Update workflow status in Supabase
+          const { error: updateError } = await supabase
+            .from('render_workflows')
+            .update(updateData)
+            .eq('id', workflow.id);
+
+          if (updateError) {
+            console.error(`Failed to update workflow ${workflow.workflow_id} status:`, updateError);
+          } else {
+            updatedWorkflows[i] = { ...workflow, ...updateData };
+          }
         }
+      } catch (error) {
+        console.error(`Error polling workflow ${workflow.workflow_id}:`, error);
       }
+    }
 
-      setRenderWorkflows(updatedWorkflows);
-    };
+    setRenderWorkflows(updatedWorkflows);
 
-    const interval = setInterval(pollWorkflows, 10000);
-    return () => clearInterval(interval);
-  }, [renderWorkflows, user]);
+  };
+
+  const interval = setInterval(pollWorkflows, 10000);
+  return () => clearInterval(interval);
+}, [renderWorkflows, user]);
+
+
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -1097,7 +1097,7 @@ const NavItem = ({ icon, label, active, onClick, href }) => {
                                 )}
                               </div>
                             )}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                               <Play size={36} className="text-purple-400" />
                             </div>
                           </div>
@@ -1123,7 +1123,7 @@ const NavItem = ({ icon, label, active, onClick, href }) => {
                           key={video.id}
                           className="border border-gray-800 rounded-xl overflow-hidden bg-gray-900/50 hover:border-gray-700 transition-all group relative"
                         >
-                          <div className="absolute top-4 left-4">
+                          <div className="absolute  top-4 left-4">
                             <Checkbox
                               checked={selectedItems.includes(`video:${video.id}`)}
                               onCheckedChange={() => handleSelectItem(video.id, 'video')}

@@ -3,8 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { 
   Upload, Video, Scissors, Folder, CheckCircle, ChevronDown, ChevronRight, Home, Settings, Users, 
-  BarChart2, HelpCircle, Plus, ArrowRight, Sparkles, Clock, Zap, BookOpen, Music, Cloud, Download, Play,
-  X, Edit2, FileText, Trash2, ChevronLeft, Film, Layout
+   HelpCircle, Plus, ArrowRight, Sparkles, Clock, Zap, BookOpen, BarChart2 as Music,  Play,
+   Edit2,  Trash2,  Film, Layout
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
@@ -161,7 +161,7 @@ const SubtitleOverlay = ({ subtitles, styleType }) => {
 
 // Remotion Video Component
 const VideoWithSubtitle = ({ videoUrl, subtitles, styleType }) => {
-  const frame = useCurrentFrame();
+ // const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
   return (
@@ -263,6 +263,7 @@ export default function VideoBulkPage() {
         console.log('FFmpeg loaded');
         setFFmpeg(ffmpegInstance);
         setIsLoadingFFmpeg(false);
+        console.log(isLoadingFFmpeg)
       } catch (error) {
         console.error('Error loading FFmpeg:', error);
         setMessage('Failed to load FFmpeg');
@@ -399,7 +400,7 @@ export default function VideoBulkPage() {
   
     try {
       const segmentDuration = 30;
-      const maxSegments = Math.min(1, Math.ceil(videoInfo.duration / segmentDuration));
+      const maxSegments = Math.min(2, Math.ceil(videoInfo.duration / segmentDuration));
       setMessage(`Splitting into ${maxSegments} segment(s) of up to 30 seconds each for Instagram Reels...`);
   
       const videoData = await fetchFile(uploadedVideo);
@@ -524,240 +525,247 @@ export default function VideoBulkPage() {
   };
 
   const generateSubtitles = async (segmentIndex) => {
-    const segment = segmentVideos[segmentIndex];
-    if (!segment) return;
+  const segment = segmentVideos[segmentIndex];
+  if (!segment) return;
 
-    setIsGeneratingSubtitles(prev => {
-      const newState = [...prev];
-      newState[segmentIndex] = true;
-      return newState;
-    });
-    setMessage(`Generating subtitles for segment ${segmentIndex + 1}...`);
+  setIsGeneratingSubtitles((prev) => {
+    const newState = [...prev];
+    newState[segmentIndex] = true;
+    return newState;
+  });
+  setMessage(`Generating subtitles for segment ${segmentIndex + 1}...`);
 
-    try {
-      const fileName = `segment_${segment.index}_${Date.now()}.mp4`;
-      const blob = await fetch(segment.url).then(res => res.blob());
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(`input/${fileName}`, blob, {
-          contentType: 'video/mp4'
+  try {
+    const fileName = `segment_${segment.index}_${Date.now()}.mp4`;
+    const blob = await fetch(segment.url).then((res) => res.blob());
+
+    // Upload to Supabase
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(`input/${fileName}`, blob, {
+        contentType: "video/mp4",
+      });
+
+      console.log(uploadData)
+
+    if (uploadError) {
+      console.error(`Supabase upload error for segment ${segmentIndex + 1}:`, uploadError);
+      setMessage(`Failed to upload segment ${segmentIndex + 1}: ${uploadError.message}`);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(`input/${fileName}`);
+
+    const publicUrl = urlData.publicUrl;
+
+    let transcription = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts && !transcription) {
+      try {
+        attempts++;
+        const response = await fetch("/api/transribevideo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            videoUrl: publicUrl, 
+            segmentStart: segment.startTime,
+            segmentDuration: segment.duration // Add segment duration to the request
+          }),
         });
 
-      if (uploadError) {
-        console.error(`Supabase upload error for segment ${segmentIndex + 1}:`, uploadError);
-        setMessage(`Failed to upload segment ${segmentIndex + 1}: ${uploadError.message}`);
-        setSegmentSubtitles(prev => {
-          const newSubtitles = [...prev];
-          newSubtitles[segmentIndex] = [{ text: 'Upload failed', start: 0, end: segment.duration }];
-          return newSubtitles;
-        });
-        return;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(`input/${fileName}`);
-      
-      const publicUrl = urlData.publicUrl;
-
-      let transcription = null;
-      let attempts = 0;
-      const maxAttempts = 3;
-
-      while (attempts < maxAttempts && !transcription) {
-        try {
-          attempts++;
-          const response = await fetch('/api/transcribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ videoUrl: publicUrl, segmentStart: segment.startTime })
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            if (attempts === maxAttempts) {
-              setMessage(`Failed to transcribe segment ${segmentIndex + 1} after ${maxAttempts} attempts`);
-              setSegmentSubtitles(prev => {
-                const newSubtitles = [...prev];
-                newSubtitles[segmentIndex] = [{ text: 'Transcription failed', start: 0, end: segment.duration }];
-                return newSubtitles;
-              });
-              break;
-            }
-            continue;
-          }
-
-          transcription = await response.json();
-        } catch (error) {
-          if (attempts === maxAttempts) {
-            setMessage(`Error transcribing segment ${segmentIndex + 1}: ${error.message}`);
-            setSegmentSubtitles(prev => {
-              const newSubtitles = [...prev];
-              newSubtitles[segmentIndex] = [{ text: 'Error generating subtitles', start: 0, end: segment.duration }];
-              return newSubtitles;
-            });
-          }
-          continue;
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error ${response.status}`);
         }
+
+        transcription = await response.json();
+      } catch (error) {
+        console.error(`Transcription attempt ${attempts} failed for segment ${segmentIndex + 1}:`, error);
+        if (attempts === maxAttempts) {
+          setMessage(`Failed to transcribe segment ${segmentIndex + 1} after ${maxAttempts} attempts`);
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
       }
+    }
 
-      if (transcription) {
-        let subtitles = [];
-        const utterances = transcription?.results?.channels?.[0]?.utterances;
-        const paragraphs = transcription?.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.paragraphs;
+    if (transcription) {
+      let subtitles = [];
 
-        if (utterances && Array.isArray(utterances)) {
-          subtitles = utterances.map(utterance => ({
+      // Handle utterances
+      const utterances = transcription?.results?.channels?.[0]?.utterances;
+      if (utterances && Array.isArray(utterances)) {
+        subtitles = utterances
+          .map((utterance) => ({
             text: utterance.transcript,
-            start: utterance.start - segment.startTime,
-            end: utterance.end - segment.startTime
-          })).filter(sub => sub.start >= 0 && sub.end <= segment.duration);
-        } else if (paragraphs && Array.isArray(paragraphs)) {
-          subtitles = paragraphs.flatMap(paragraph =>
-            paragraph.sentences.map(sentence => ({
+            start: utterance.start,
+            end: utterance.end,
+          }))
+          .filter((sub) => sub.start >= 0 && sub.end <= segment.duration && sub.text.trim() !== "");
+      }
+
+      // Fallback to paragraphs if no utterances
+      const paragraphs = transcription?.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.paragraphs;
+      if (!subtitles.length && paragraphs && Array.isArray(paragraphs)) {
+        subtitles = paragraphs
+          .flatMap((paragraph) =>
+            paragraph.sentences.map((sentence) => ({
               text: sentence.text,
-              start: sentence.start - segment.startTime,
-              end: sentence.end - segment.startTime
+              start: sentence.start,
+              end: sentence.end,
             }))
-          ).filter(sub => sub.start >= 0 && sub.end <= segment.duration);
-        }
-
-        if (subtitles.length === 0) {
-          subtitles = [{ text: 'No audio detected', start: 0, end: segment.duration }];
-        }
-
-        setSegmentSubtitles(prev => {
-          const newSubtitles = [...prev];
-          newSubtitles[segmentIndex] = subtitles;
-          return newSubtitles;
-        });
-        setMessage(`Subtitles generated for segment ${segmentIndex + 1}.`);
+          )
+          .filter((sub) => sub.start >= 0 && sub.end <= segment.duration && sub.text.trim() !== "");
       }
 
-      const { error: deleteError } = await supabase.storage
-        .from('avatars')
-        .remove([`input/${fileName}`]);
-
-      if (deleteError) {
-        console.warn(`Failed to delete segment ${fileName} from Supabase:`, deleteError);
-      }
-    } catch (error) {
-      console.error(`Error processing segment ${segmentIndex + 1}:`, error);
-      setMessage(`Error processing segment ${segmentIndex + 1}: ${error.message}`);
+      // Update subtitles state immutably
       setSegmentSubtitles(prev => {
         const newSubtitles = [...prev];
-        newSubtitles[segmentIndex] = [{ text: 'Error generating subtitles', start: 0, end: segment.duration }];
+        newSubtitles[segmentIndex] = subtitles.length ? subtitles : [{ 
+          text: "No clear audio detected", 
+          start: 0, 
+          end: segment.duration 
+        }];
         return newSubtitles;
       });
-    } finally {
-      setIsGeneratingSubtitles(prev => {
-        const newState = [...prev];
-        newState[segmentIndex] = false;
-        return newState;
-      });
+
+      setMessage(`Subtitles generated for segment ${segmentIndex + 1}.`);
     }
-  };
+
+    // Clean up Supabase storage
+    const { error: deleteError } = await supabase.storage
+      .from("avatars")
+      .remove([`input/${fileName}`]);
+
+    if (deleteError) {
+      console.warn(`Failed to delete segment ${fileName} from Supabase:`, deleteError);
+    }
+  } catch (error) {
+    console.error(`Error processing segment ${segmentIndex + 1}:`, error);
+    setMessage(`Error processing segment ${segmentIndex + 1}: ${error.message}`);
+    setSegmentSubtitles(prev => {
+      const newSubtitles = [...prev];
+      newSubtitles[segmentIndex] = [{ 
+        text: "Error generating subtitles", 
+        start: 0, 
+        end: segment.duration 
+      }];
+      return newSubtitles;
+    });
+  } finally {
+    setIsGeneratingSubtitles(prev => {
+      const newState = [...prev];
+      newState[segmentIndex] = false;
+      return newState;
+    });
+  }
+};
 
   const renderAllSegments = async () => {
-    if (!segmentVideos.length) {
-      setMessage('No segments to render.');
-      return;
-    }
-  
-    if (!user?.id) {
-      setMessage('User authentication required to render segments.');
-      return;
-    }
-  
-    setIsProcessing(true);
-    setMessage('Initiating rendering for all segments...');
-  
-    try {
-      const segments = await Promise.all(
-        segmentVideos.map(async (segment, index) => {
-          const fileName = `segment_${segment.index}_${Date.now()}.mp4`;
-          const blob = await fetch(segment.url).then((res) => {
-            if (!res.ok) throw new Error(`Failed to fetch segment ${index + 1}: ${res.statusText}`);
-            return res.blob();
-          });
-  
-          let uploadData, uploadError;
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            ({ data: uploadData, error: uploadError } = await supabase.storage
-              .from('avatars')
-              .upload(`input/${fileName}`, blob, {
-                contentType: 'video/mp4',
-              }));
-  
-            console.log(`Upload attempt ${attempt} for segment ${index + 1}:`, { uploadData, uploadError });
-  
-            if (!uploadError) break;
-  
-            if (attempt === 3) {
-              console.error(`Upload failed for segment ${index + 1} after 3 attempts:`, uploadError);
-              throw new Error(`Failed to upload segment ${index + 1}: ${uploadError.message}`);
-            }
-  
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          }
-  
-          const { data: urlData, error: urlError } = supabase.storage
+  if (!segmentVideos.length) {
+    setMessage('No segments to render.');
+    return;
+  }
+
+  if (!user?.id) {
+    setMessage('User authentication required to render segments.');
+    return;
+  }
+
+  setIsProcessing(true);
+  setMessage('Initiating rendering for all segments...');
+
+  try {
+    const segments = await Promise.all(
+      segmentVideos.map(async (segment, index) => {
+        const fileName = `segment_${segment.index}_${Date.now()}.mp4`;
+        const blob = await fetch(segment.url).then((res) => {
+          if (!res.ok) throw new Error(`Failed to fetch segment ${index + 1}: ${res.statusText}`);
+          return res.blob();
+        });
+
+        let uploadData, uploadError;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          ({ data: uploadData, error: uploadError } = await supabase.storage
             .from('avatars')
-            .getPublicUrl(`input/${fileName}`);
-  
-          if (urlError || !urlData.publicUrl) {
-            throw new Error(`Failed to get public URL for segment ${index + 1}: ${urlError?.message}`);
+            .upload(`input/${fileName}`, blob, {
+              contentType: 'video/mp4',
+            }));
+console.log(uploadData)
+          if (!uploadError) break;
+
+          if (attempt === 3) {
+            throw new Error(`Failed to upload segment ${index + 1}: ${uploadError.message}`);
           }
-  
-          console.log(`Public URL for segment ${index + 1}:`, urlData.publicUrl);
-  
-          const response = await fetch(urlData.publicUrl, { method: 'HEAD' });
-          if (!response.ok) {
-            throw new Error(`Segment ${index + 1} URL is inaccessible: ${urlData.publicUrl} (Status: ${response.status})`);
-          }
-  
-          return {
-            videoPath: `input/${fileName}`,
-            subtitles: segmentSubtitles[index] || [],
-            styleType: subtitleStyles[index] || 'none',
-            segmentIndex: index,
-            duration: segment.duration,
-            title: segmentMetadata[index]?.title || `Segment ${index + 1}`,
-            description: segmentMetadata[index]?.description || ''
-          };
-        })
-      );
-  
-      console.log('Segments to render:', segments);
-  
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-  
-      const response = await fetch('/api/bulkrender', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segments, userId: user.id }),
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Bulk render error:', errorData);
-        throw new Error(errorData.error || 'Failed to initiate rendering');
-      }
-  
-      const { workflowIds } = await response.json();
-      setMessage(
-        `Rendering initiated for ${workflowIds.length} segments. Workflow IDs: ${workflowIds.join(', ')}. Check Video Library for status.`
-      );
-  
-      setWorkflowData({ workflowIds, segmentPaths: segments.map((s) => s.videoPath) });
-    } catch (error) {
-      console.error('Error initiating rendering:', error);
-      setMessage(`Error initiating rendering: ${error.message}`);
-    } finally {
-      setIsProcessing(false);
+
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(`input/${fileName}`);
+
+        if (!urlData?.publicUrl) {
+          throw new Error(`Failed to get public URL for segment ${index + 1}`);
+        }
+
+        const videoPath = urlData.publicUrl;
+
+        const response = await fetch(videoPath, { method: 'HEAD' });
+        if (!response.ok) {
+          throw new Error(`Segment ${index + 1} URL is inaccessible: ${videoPath} (Status: ${response.status})`);
+        }
+
+        return {
+          videoUrls: [
+            {
+              src: videoPath,
+              start: segment.startTime || 0, // Use segment's startTime
+              end: segment.startTime + segment.duration // Calculate end based on duration
+            }
+          ],
+          subtitles: segmentSubtitles[index] || [],
+          styleType: subtitleStyles[index] || 'none',
+          segmentIndex: index,
+          duration: segment.duration,
+          title: segmentMetadata[index]?.title || `Segment ${index + 1}`,
+          description: segmentMetadata[index]?.description || ''
+        };
+      })
+    );
+
+    const response = await fetch('/api/bulkrender', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        segments, 
+        userId: user.id 
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to initiate rendering');
     }
-  };
+
+    const { workflowIds } = await response.json();
+    setMessage(
+      `Rendering initiated for ${workflowIds.length} segments. Workflow IDs: ${workflowIds.join(', ')}`
+    );
+
+    setWorkflowData({ workflowIds, segmentPaths: segments.map((s) => s.videoUrls[0].src) });
+    console.log(workflowData)
+  } catch (error) {
+    console.error('Error initiating rendering:', error);
+    setMessage(`Error initiating rendering: ${error.message}`);
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   const handleSubtitleStyleChange = (index, style) => {
     setSubtitleStyles(prev => {
@@ -1196,7 +1204,7 @@ export default function VideoBulkPage() {
                 <div className="p-3 bg-blue-500/10 rounded-xl w-14 h-14 flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-all duration-300 z-10">
                   <Folder className="text-blue-400 group-hover:text-blue-300 transition-all" size={28} />
                 </div>
-                <h3 className="text-xl font-semibold mb-2 text-white group-hover:text-blue-300 transition-colors z-10 relative">Bulk Upload</h3>
+                <h3 className="text-xl font-semibold mb-2 text-white group-hover:text-blue-300 transition-colors z-10 relative">AI Generate</h3>
                 <p className="text-gray-400 mb-4 text-sm z-10 relative">
                   Process multiple videos at once for different social media platforms
                 </p>
@@ -1633,106 +1641,109 @@ export default function VideoBulkPage() {
                                 </div>
 
                                 <div className="mb-6">
-                                  <div className="flex justify-between items-center mb-3">
-                                    <label className="block text-sm font-medium text-gray-400">Subtitles</label>
-                                    <button
-                                      onClick={() => generateSubtitles(activeSegmentIndex)}
-                                      disabled={isGeneratingSubtitles[activeSegmentIndex]}
-                                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white py-2 px-4 rounded-lg flex items-center disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-900/20"
-                                    >
-                                      <Sparkles size={16} className="mr-1" />
-                                      {isGeneratingSubtitles[activeSegmentIndex] ? 'Generating...' : 'Generate Subtitles'}
-                                    </button>
-                                  </div>
-                                  {segmentSubtitles[activeSegmentIndex]?.length > 0 ? (
-                                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                                      {segmentSubtitles[activeSegmentIndex].map((subtitle, subIndex) => (
-                                        <div key={subIndex} className="flex items-center space-x-2 bg-gray-900/50 p-3 rounded-lg">
-                                          <div className="flex-1">
-                                            {editingSegmentIndex === activeSegmentIndex && subIndex === editingSegmentIndex ? (
-                                              <div className="space-y-2">
-                                                <input
-                                                  type="text"
-                                                  value={newSubtitle.text}
-                                                  onChange={(e) => setNewSubtitle({ ...newSubtitle, text: e.target.value })}
-                                                  className="w-full bg-gray-900/70 border border-gray-700 rounded-lg py-2 px-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                                  placeholder="Subtitle text"
-                                                />
-                                                <div className="flex space-x-2">
-                                                  <input
-                                                    type="number"
-                                                    step="0.1"
-                                                    value={newSubtitle.start}
-                                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, start: e.target.value })}
-                                                    className="w-1/2 bg-gray-900/70 border border-gray-700 rounded-lg py-2 px-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                                    placeholder="Start (s)"
-                                                  />
-                                                  <input
-                                                    type="number"
-                                                    step="0.1"
-                                                    value={newSubtitle.end}
-                                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, end: e.target.value })}
-                                                    className="w-1/2 bg-gray-900/70 border border-gray-700 rounded-lg py-2 px-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                                    placeholder="End (s)"
-                                                  />
-                                                </div>
-                                                <div className="flex space-x-2">
-                                                  <button
-                                                    onClick={() => {
-                                                      handleEditSubtitle(activeSegmentIndex, subIndex, newSubtitle);
-                                                      setEditingSegmentIndex(null);
-                                                    }}
-                                                    className="bg-green-600 text-white py-1 px-3 rounded-lg"
-                                                  >
-                                                    Save
-                                                  </button>
-                                                  <button
-                                                    onClick={() => setEditingSegmentIndex(null)}
-                                                    className="bg-gray-600 text-white py-1 px-3 rounded-lg"
-                                                  >
-                                                    Cancel
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            ) : (
-                                              <div>
-                                                <p className="text-sm text-white">{subtitle.text}</p>
-                                                <p className="text-xs text-gray-400">
-                                                  {subtitle.start.toFixed(1)}s - {subtitle.end.toFixed(1)}s
-                                                </p>
-                                              </div>
-                                            )}
-                                          </div>
-                                          <div className="flex space-x-1">
-                                            <button
-                                              onClick={() => {
-                                                setEditingSegmentIndex(activeSegmentIndex);
-                                                setEditingSegmentIndex(subIndex);
-                                                setNewSubtitle({
-                                                  text: subtitle.text,
-                                                  start: subtitle.start,
-                                                  end: subtitle.end
-                                                });
-                                              }}
-                                              className="p-1 text-gray-400 hover:text-white"
-                                            >
-                                              <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                              onClick={() => handleDeleteSubtitle(activeSegmentIndex, subIndex)}
-                                              className="p-1 text-gray-400 hover:text-red-500"
-                                            >
-                                              <Trash2 size={16} />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-gray-400 text-sm">No subtitles available. Click 'Generate Subtitles' to add them.</p>
-                                  )}
-                                </div>
-
+  <div className="flex justify-between items-center mb-3">
+    <label className="block text-sm font-medium text-gray-400">Subtitles</label>
+    <button
+      onClick={() => generateSubtitles(activeSegmentIndex)}
+      disabled={isGeneratingSubtitles[activeSegmentIndex]}
+      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white py-2 px-4 rounded-lg flex items-center disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-900/20"
+    >
+      <Sparkles size={16} className="mr-1" />
+      {isGeneratingSubtitles[activeSegmentIndex] ? "Generating..." : "Generate Subtitles"}
+    </button>
+  </div>
+  {segmentSubtitles[activeSegmentIndex]?.length > 0 ? (
+    <div className="space-y-2 max-h-64 overflow-y-auto">
+      {segmentSubtitles[activeSegmentIndex].map((subtitle, subIndex) => (
+        <div key={subIndex} className="flex items-center space-x-2 bg-gray-900/50 p-3 rounded-lg">
+          <div className="flex-1">
+            {editingSegmentIndex === activeSegmentIndex && subIndex === editingSegmentIndex ? (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={newSubtitle.text}
+                  onChange={(e) => setNewSubtitle({ ...newSubtitle, text: e.target.value })}
+                  className="w-full bg-gray-900/70 border border-gray-700 rounded-lg py-2 px-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="Subtitle text"
+                />
+                <div className="flex space-x-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={newSubtitle.start}
+                    onChange={(e) => setNewSubtitle({ ...newSubtitle, start: e.target.value })}
+                    className="w-1/2 bg-gray-900/70 border border-gray-700 rounded-lg py-2 px-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Start (s)"
+                  />
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={newSubtitle.end}
+                    onChange={(e) => setNewSubtitle({ ...newSubtitle, end: e.target.value })}
+                    className="w-1/2 bg-gray-900/70 border border-gray-700 rounded-lg py-2 px-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="End (s)"
+                  />
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => {
+                      handleEditSubtitle(activeSegmentIndex, subIndex, newSubtitle);
+                      setEditingSegmentIndex(null);
+                    }}
+                    className="bg-green-600 text-white py-1 px-3 rounded-lg"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingSegmentIndex(null)}
+                    className="bg-gray-600 text-white py-1 px-3 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-white">{subtitle.text}</p>
+                <p className="text-xs text-gray-400">
+                  {subtitle.start.toFixed(1)}s - {subtitle.end.toFixed(1)}s
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="flex space-x-1">
+            <button
+              onClick={() => {
+                setEditingSegmentIndex(activeSegmentIndex);
+                setEditingSegmentIndex(subIndex);
+                setNewSubtitle({
+                  text: subtitle.text,
+                  start: subtitle.start,
+                  end: subtitle.end,
+                });
+              }}
+              className="p-1 text-gray-400 hover:text-white"
+            >
+              <Edit2 size={16} />
+            </button>
+            <button
+              onClick={() => handleDeleteSubtitle(activeSegmentIndex, subIndex)}
+              className="p-1 text-gray-400 hover:text-red-500"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="text-gray-400 text-sm">
+      {isGeneratingSubtitles[activeSegmentIndex]
+        ? "Generating subtitles..."
+        : "No subtitles available. Click 'Generate Subtitles' to add them."}
+    </p>
+  )}
+</div>
                                 <div>
                                   <label className="block text-sm font-medium text-gray-400 mb-2">Add New Subtitle</label>
                                   <div className="space-y-2">
